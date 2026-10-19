@@ -21,4 +21,4 @@
 `index.html` · `style.css` · `game.js` · `background.mp3` (اختیاری) · `logo.png` (اختیاری)
 
 ## سازنده
-مهدی فرهادی نژاد
+mahdi fn
