@@ -1,0 +1,123 @@
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: Tahoma, "Segoe UI", sans-serif;
+  background: linear-gradient(#cceeff, #e9f8ff);
+  min-height: 100vh;
+  color: #123;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.title { text-align: center; margin: 10px 0 6px; font-size: 24px; }
+.hint { text-align: center; margin: 6px 10px; font-size: 13px; color: #456; }
+
+button, select {
+  font-family: inherit;
+  font-size: 16px;
+  padding: 10px 18px;
+  margin: 4px;
+  border-radius: 10px;
+  border: 2px solid #0288d1;
+  background: #fff;
+  color: #0277bd;
+  cursor: pointer;
+  transition: transform .08s, background .15s;
+}
+button:hover { background: #e1f5fe; }
+button:active { transform: scale(.96); }
+button.primary { background: #0288d1; color: #fff; }
+button.primary:hover { background: #0277bd; }
+
+/* ---------- Stage ---------- */
+#stage {
+  position: relative;
+  width: min(100%, 900px);
+  margin: 0 auto;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
+}
+#canvas { display: block; width: 100%; height: auto; background: #87ceeb; }
+
+#hud {
+  position: absolute;
+  top: 6px; left: 6px; right: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+  flex-wrap: wrap;
+}
+#hud[hidden] { display: none; }
+.hud-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip {
+  background: rgba(255, 255, 255, .8);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+.chip.power { background: rgba(255, 235, 59, .9); }
+.chip[hidden] { display: none; }
+.icon-btn { pointer-events: auto; padding: 4px 8px; margin: 0; font-size: 16px; }
+.pulse { animation: pulse .5s; }
+@keyframes pulse { 50% { transform: scale(1.4); color: #e65100; } }
+
+/* ---------- Touch controls ---------- */
+#touchControls { display: none; gap: 10px; padding: 10px; justify-content: center; }
+.big-btn { flex: 1; max-width: 260px; padding: 22px 10px; font-size: 20px; }
+@media (pointer: coarse) { #touchControls { display: flex; } }
+
+/* ---------- Screens (full-viewport overlays) ---------- */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 30, 60, .55);
+  z-index: 10;
+  overflow: auto;
+  padding: 10px;
+}
+.screen.active { display: flex; }
+
+.panel {
+  background: #fff;
+  border-radius: 18px;
+  padding: 20px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 95vh;
+  overflow: auto;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  animation: pop .2s ease-out;
+}
+.panel.wide { max-width: 560px; }
+@keyframes pop { from { transform: scale(.9); opacity: 0; } }
+.panel h2 { color: #0288d1; margin-top: 0; }
+.logo { max-width: 200px; max-height: 100px; }
+.btns { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.row { display: block; margin: 10px 0; }
+.muted { color: #567; }
+.small { font-size: 12px; }
+.record { color: #e65100; font-weight: bold; font-size: 20px; margin: 4px; }
+
+.tutorial-list { text-align: right; line-height: 1.9; padding-inline-start: 22px; }
+
+.selected-box { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.preview { font-size: 48px; line-height: 1; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 10px 0; }
+.card { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; padding: 10px 4px; }
+.card .emoji { font-size: 36px; line-height: 1.2; }
+.card.selected { background: #e1f5fe; border-color: #ff9800; }
+.card small { color: #567; }
+
+.scores { text-align: right; margin: 8px 0; }
+.scores ol { margin: 4px 0; padding-inline-start: 26px; }

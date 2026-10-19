@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>گربه دونده | Cat Runner</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐱</text></svg>">
+</head>
+<body>
+
+  <h1 class="title">🐱 گربه دونده</h1>
+
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+
+    <div id="hud" hidden>
+      <div class="hud-group">
+        <span class="chip">امتیاز: <b id="hudScore">۰</b></span>
+        <span class="chip">رکورد: <b id="hudBest">۰</b></span>
+        <span class="chip">🪙 <b id="hudCoins">۰</b></span>
+      </div>
+      <div class="hud-group">
+        <span class="chip power" id="hudShield" hidden>🛡️ سپر</span>
+        <span class="chip power" id="hudMagnet" hidden>🧲 <b id="hudMagnetTime">۰</b></span>
+        <button class="icon-btn" data-action="mute" title="صدا (M)">🔊</button>
+        <button class="icon-btn" data-action="pause" title="توقف (P)">⏸️</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="touchControls">
+    <button id="duckBtn" class="big-btn">⬇️ خم شدن</button>
+    <button id="jumpBtn" class="big-btn">⬆️ پرش</button>
+  </div>
+
+  <p class="hint">پرش: Space / ↑ / W (دوبار برای پرش دوتایی) &nbsp;|&nbsp; خم شدن: ↓ / S &nbsp;|&nbsp; توقف: P &nbsp;|&nbsp; صدا: M</p>
+  <p class="hint">طراح: مهدی</p>
+
+  <!-- منو -->
+  <div id="menu" class="screen active">
+    <div class="panel">
+      <img src="logo.png" alt="" class="logo" onerror="this.remove()">
+      <h2>🐱 گربه دونده</h2>
+      <p>برای پرش Space بزن!</p>
+      <p class="muted">رکورد: <b data-bind="best">۰</b> &nbsp; 🪙 <b data-bind="coins">۰</b></p>
+      <label class="row">درجه سختی:
+        <select id="difficulty">
+          <option value="easy">آسان</option>
+          <option value="normal">معمولی</option>
+          <option value="hard">سخت</option>
+        </select>
+      </label>
+      <div class="btns">
+        <button class="primary" data-action="start">▶ شروع بازی</button>
+        <button data-action="tutorial">📖 آموزش</button>
+        <button data-action="shop">🛒 فروشگاه</button>
+        <button data-action="mute" id="menuMute">🔊 صدا</button>
+      </div>
+      <p class="muted small">طراح: مهدی</p>
+    </div>
+  </div>
+
+  <!-- آموزش -->
+  <div id="tutorial" class="screen">
+    <div class="panel">
+      <h2>📖 آموزش بازی</h2>
+      <ul class="tutorial-list">
+        <li>با <b>Space</b> یا <b>↑</b> یا لمس صفحه بپرید. در هوا یک بار دیگر هم می‌توانید بپرید (پرش دوتایی).</li>
+        <li>با نگه داشتن <b>↓</b> خم شوید و از زیر پرنده‌های بالا رد شوید.</li>
+        <li>🌵 کاکتوس، 🪨 سنگ و 🐦 پرنده مانع هستند.</li>
+        <li>🪙 سکه جمع کنید و در فروشگاه شخصیت جدید بخرید.</li>
+        <li>🛡️ سپر یک برخورد را تحمل می‌کند. 🧲 آهنربا سکه‌ها را جذب می‌کند.</li>
+        <li>هر چه جلوتر بروید سریع‌تر می‌شود و شب و روز عوض می‌شود 🌙</li>
+        <li><b>P</b> توقف، <b>M</b> قطع/وصل صدا.</li>
+      </ul>
+      <button data-action="menu">بازگشت</button>
+    </div>
+  </div>
+
+  <!-- فروشگاه -->
+  <div id="shop" class="screen">
+    <div class="panel wide">
+      <h2>🛒 فروشگاه</h2>
+      <p>سکه‌ها: <b id="shopCoins">۰</b> 🪙</p>
+      <div class="selected-box">
+        <span>شخصیت انتخاب‌شده: <b id="selectedCharacterName"></b></span>
+        <div id="selectedCharacterPreview" class="preview"></div>
+      </div>
+      <p id="shopMsg" class="muted small">&nbsp;</p>
+      <div id="shopCharacters" class="cards"></div>
+      <button data-action="menu">بازگشت</button>
+    </div>
+  </div>
+
+  <!-- توقف -->
+  <div id="pause" class="screen">
+    <div class="panel">
+      <h2>⏸️ توقف</h2>
+      <div class="btns">
+        <button class="primary" data-action="resume">▶ ادامه</button>
+        <button data-action="start">🔄 شروع مجدد</button>
+        <button data-action="menu">🏠 منو</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- باخت -->
+  <div id="gameover" class="screen">
+    <div class="panel">
+      <h2>باختی! 💥</h2>
+      <p>امتیاز: <b id="goScore">۰</b> &nbsp; 🪙 <b id="goCoins">۰</b></p>
+      <p id="goRecord" class="record" hidden>🏆 رکورد جدید!</p>
+      <p class="muted">رکورد: <b id="goBest">۰</b></p>
+      <div class="scores">
+        <b>۵ امتیاز برتر</b>
+        <ol id="goScores"></ol>
+      </div>
+      <div class="btns">
+        <button class="primary" data-action="start">🔄 شروع مجدد</button>
+        <button data-action="shop">🛒 فروشگاه</button>
+        <button data-action="menu">🏠 منو</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
