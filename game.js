@@ -201,7 +201,8 @@
 
   function update(dt) {
     g.t += dt;
-    g.speed = Math.min(g.d.max, g.speed + g.d.accel * dt);
+    const progress = 1 - Math.exp(-g.t / 45);
+    g.speed = g.d.base + (g.d.max - g.d.base) * progress;
     g.score += (g.speed * dt) / 18;
     g.bgx += g.speed * 0.15 * dt;
     g.groundX = (g.groundX + g.speed * dt) % 40;
@@ -244,7 +245,15 @@
       }
       if (!it.done && Math.hypot(pcx - it.x, pcy - it.y) < it.r + 22) {
         it.done = true;
-        if (it.type === 'coin') { g.coins++; sfx.coin(); burst(it.x, it.y, '#ffd600', 5, 120); }
+        if (it.type === 'coin') {
+          const coinMultiplier = { easy: 0.5, normal: 1, hard: 1.5 }[save.difficulty] ?? 1;
+          g.coinFraction = (g.coinFraction || 0) + coinMultiplier;
+          const earned = Math.floor(g.coinFraction);
+          g.coinFraction -= earned;
+          g.coins += earned;
+          sfx.coin();
+          burst(it.x, it.y, '#ffd600', 5, 120);
+        }
         else if (it.type === 'shield') { g.shield = true; sfx.power(); burst(it.x, it.y, '#40c4ff', 10); }
         else if (it.type === 'magnet') { g.magnet = 8; sfx.power(); burst(it.x, it.y, '#e040fb', 10); }
       }
@@ -364,7 +373,7 @@
 
   function drawItem(it) {
     if (it.type === 'coin') {
-      const sx = Math.max(0.15, Math.abs(Math.cos(g.t * 5 + it.x * 0.05)));
+      const sx = Math.max(0.25, Math.abs(Math.cos(g.t * 2.5 + it.x * 0.02)));
       ctx.save(); ctx.translate(it.x, it.y); ctx.scale(sx, 1);
       ctx.fillStyle = '#ffd600'; ctx.strokeStyle = '#e6a100'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(0, 0, it.r, 0, 7); ctx.fill(); ctx.stroke();
@@ -386,11 +395,17 @@
 
     const char = CHARACTERS.find(c => c.id === save.selected) || CHARACTERS[0];
     const bob = p.grounded && state !== 'over' ? -Math.abs(Math.sin(p.run * 10)) * 4 : 0;
+
     ctx.save();
     ctx.translate(p.x + 22, p.y + bob);
     if (!p.grounded) ctx.rotate(Math.max(-0.3, Math.min(0.4, p.vy / 2500)));
     if (p.ducking) ctx.scale(1.2, 0.62);
-    ctx.font = `44px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    if (char.id === 'unicorn') ctx.scale(-1, 1);
+    ctx.font = `44px ${EMOJI_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(char.emoji, 0, 4);
     ctx.restore();
 
