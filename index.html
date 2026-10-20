@@ -2,7 +2,8 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0288d1">
   <title>گربه دونده | Cat Runner</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐱</text></svg>">
@@ -16,15 +17,20 @@
 
     <div id="hud" hidden>
       <div class="hud-group">
-        <span class="chip">امتیاز: <b id="hudScore">۰</b></span>
+        <span class="chip" id="hudScoreChip">امتیاز: <b id="hudScore">۰</b></span>
         <span class="chip">رکورد: <b id="hudBest">۰</b></span>
         <span class="chip">🪙 <b id="hudCoins">۰</b></span>
       </div>
       <div class="hud-group">
-        <span class="chip power" id="hudShield" hidden>🛡️ سپر</span>
-        <span class="chip power" id="hudMagnet" hidden>🧲 <b id="hudMagnetTime">۰</b></span>
         <button class="icon-btn" data-action="mute" title="صدا (M)">🔊</button>
         <button class="icon-btn" data-action="pause" title="توقف (P)">⏸️</button>
+      </div>
+      <div id="powerBar">
+        <span class="chip power" data-p="shield" hidden>🛡️ سپر<i class="bar"></i></span>
+        <span class="chip power" data-p="magnet" hidden>🧲 <b>۰</b><i class="bar"></i></span>
+        <span class="chip power" data-p="x2" hidden>✨ ×۲ <b>۰</b><i class="bar"></i></span>
+        <span class="chip power" data-p="boost" hidden>🚀 <b>۰</b><i class="bar"></i></span>
+        <span class="chip power" data-p="revive" hidden>💖 نجات<i class="bar"></i></span>
       </div>
     </div>
   </div>
@@ -39,23 +45,27 @@
 
   <!-- منو -->
   <div id="menu" class="screen active">
-    <div class="panel">
-      <img src="logo.png" alt="" class="logo" onerror="this.remove()">
-      <h2>🐱 گربه دونده</h2>
-      <p>برای پرش Space بزن!</p>
-      <p class="muted">رکورد: <b data-bind="best">۰</b> &nbsp; 🪙 <b data-bind="coins">۰</b></p>
-      <label class="row">درجه سختی:
-        <select id="difficulty">
-          <option value="easy">آسان</option>
-          <option value="normal">معمولی</option>
-          <option value="hard">سخت</option>
-        </select>
-      </label>
-      <div class="btns">
-        <button class="primary" data-action="start">▶ شروع بازی</button>
-        <button data-action="tutorial">📖 آموزش</button>
+    <div class="panel menu-panel">
+      <button class="icon-btn corner" id="menuMute" data-action="mute" title="صدا (M)">🔊</button>
+      <img src="logo.png" alt="" class="logo" onload="document.getElementById('menuHero').hidden=true" onerror="this.remove()">
+      <div class="hero" id="menuHero">🐱</div>
+      <h2>گربه دونده <small class="ver">نسخه ۲.۰</small></h2>
+      <p class="muted">برای پرش Space بزن!</p>
+      <div class="stats-row">
+        <div class="stat"><small>رکورد</small><b data-bind="best">۰</b></div>
+        <div class="stat"><small>سکه</small><b>🪙 <span data-bind="coins">۰</span></b></div>
+      </div>
+      <div class="seg" id="difficulty" role="group" aria-label="درجه سختی">
+        <button data-action="diff" data-d="easy">آسان</button>
+        <button data-action="diff" data-d="normal">معمولی</button>
+        <button data-action="diff" data-d="hard">سخت</button>
+      </div>
+      <button class="primary big" data-action="start">▶ شروع بازی</button>
+      <div class="grid2">
         <button data-action="shop">🛒 فروشگاه</button>
-        <button data-action="mute" id="menuMute">🔊 صدا</button>
+        <button data-action="missions">🎯 مأموریت‌ها <span class="badge" data-bind="claimable" hidden>۰</span></button>
+        <button data-action="tutorial">📖 آموزش</button>
+        <button data-action="settings">⚙️ تنظیمات</button>
       </div>
       <p class="muted small">طراح: مهدی</p>
     </div>
@@ -68,10 +78,11 @@
       <ul class="tutorial-list">
         <li>با <b>Space</b> یا <b>↑</b> یا لمس صفحه بپرید. در هوا یک بار دیگر هم می‌توانید بپرید (پرش دوتایی).</li>
         <li>با نگه داشتن <b>↓</b> خم شوید و از زیر پرنده‌های بالا رد شوید.</li>
-        <li>🌵 کاکتوس، 🪨 سنگ و 🐦 پرنده مانع هستند.</li>
-        <li>🪙 سکه جمع کنید و در فروشگاه شخصیت جدید بخرید.</li>
+        <li>🌵 کاکتوس، 🪨 سنگ و 🐦 پرنده مانع هستند. 🪙 سکه جمع کنید و شخصیت جدید بخرید.</li>
         <li>🛡️ سپر یک برخورد را تحمل می‌کند. 🧲 آهنربا سکه‌ها را جذب می‌کند.</li>
-        <li>هر چه جلوتر بروید سریع‌تر می‌شود و شب و روز عوض می‌شود 🌙</li>
+        <li>✨ امتیاز دوبرابر (۱۰ ثانیه). 🚀 سرعت‌دهنده (۵ ثانیه): شکست‌ناپذیر می‌شوید و موانع را خرد می‌کنید.</li>
+        <li>💖 نجات یک‌باره: اولین برخورد مرگبار شما را نمی‌کشد و موانع نزدیک پاک می‌شوند.</li>
+        <li>🎯 با انجام مأموریت‌ها سکهٔ جایزه بگیرید؛ هر جایزه فقط یک بار داده می‌شود.</li>
         <li><b>P</b> توقف، <b>M</b> قطع/وصل صدا.</li>
       </ul>
       <button data-action="menu">بازگشت</button>
@@ -97,9 +108,14 @@
   <div id="pause" class="screen">
     <div class="panel">
       <h2>⏸️ توقف</h2>
-      <div class="btns">
-        <button class="primary" data-action="resume">▶ ادامه</button>
+      <div class="stats-row">
+        <div class="stat"><small>امتیاز</small><b id="pauseScore">۰</b></div>
+        <div class="stat"><small>سکه</small><b>🪙 <span id="pauseCoins">۰</span></b></div>
+      </div>
+      <div class="btns col">
+        <button class="primary big" data-action="resume">▶ ادامه</button>
         <button data-action="start">🔄 شروع مجدد</button>
+        <button data-action="settings">⚙️ تنظیمات</button>
         <button data-action="menu">🏠 منو</button>
       </div>
     </div>
@@ -109,9 +125,14 @@
   <div id="gameover" class="screen">
     <div class="panel">
       <h2>باختی! 💥</h2>
-      <p>امتیاز: <b id="goScore">۰</b> &nbsp; 🪙 <b id="goCoins">۰</b></p>
       <p id="goRecord" class="record" hidden>🏆 رکورد جدید!</p>
+      <div class="stats-row">
+        <div class="stat"><small>امتیاز</small><b id="goScore">۰</b></div>
+        <div class="stat"><small>سکه</small><b id="goCoins">۰</b></div>
+        <div class="stat"><small>موانع</small><b id="goPassed">۰</b></div>
+      </div>
       <p class="muted">رکورد: <b id="goBest">۰</b></p>
+      <button id="goHint" class="hint-btn" data-action="missions" hidden></button>
       <div class="scores">
         <b>۵ امتیاز برتر</b>
         <ol id="goScores"></ol>
@@ -123,6 +144,47 @@
       </div>
     </div>
   </div>
+
+  <!-- مأموریت‌ها و دستاوردها -->
+  <div id="missions" class="screen">
+    <div class="panel wide">
+      <h2>🎯 مأموریت‌ها</h2>
+      <p>سکه‌ها: <b id="missionCoins">۰</b> 🪙</p>
+      <div class="tabs">
+        <button data-action="tab" data-tab="missions" class="active">مأموریت‌ها</button>
+        <button data-action="tab" data-tab="ach">دستاوردها</button>
+      </div>
+      <div id="missionList" class="mission-list"></div>
+      <div class="btns">
+        <button id="claimAllBtn" class="primary" data-action="claimAll">🎁 دریافت همه</button>
+        <button data-action="back">بازگشت</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- تنظیمات -->
+  <div id="settings" class="screen">
+    <div class="panel">
+      <h2>⚙️ تنظیمات</h2>
+      <label class="set-row"><span>🎵 موسیقی</span><input type="checkbox" id="optMusic"></label>
+      <label class="set-row"><span>صدای موسیقی</span><input type="range" id="volMusic" min="0" max="100"></label>
+      <label class="set-row"><span>🔊 افکت‌های صوتی</span><input type="checkbox" id="optSfx"></label>
+      <label class="set-row"><span>صدای افکت‌ها</span><input type="range" id="volSfx" min="0" max="100"></label>
+      <label class="set-row"><span>📳 ارتعاش (موبایل)</span><input type="checkbox" id="optVibrate"></label>
+      <div id="dataBox" class="data-box">
+        <h3>💾 ذخیره و بازیابی</h3>
+        <div class="btns">
+          <button data-action="export">⬇️ خروجی JSON</button>
+          <button data-action="import">⬆️ بازیابی از فایل</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <p id="dataMsg" class="muted small" role="status"></p>
+      </div>
+      <button data-action="back">بازگشت</button>
+    </div>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
 
   <script src="game.js"></script>
 </body>

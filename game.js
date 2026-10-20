@@ -4,12 +4,22 @@
   const $ = id => document.getElementById(id);
   const W = 800, H = 360, GROUND_H = 60, GY = H - GROUND_H;
   const GRAV = 2200, JUMP = 760;
+  const POWER_DUR = { magnet: 8, x2: 10, boost: 5 };
+  const BOOST_MUL = 1.6;
+  const POWER_ICONS = { shield: '🛡️', magnet: '🧲', x2: '✨', boost: '🚀', revive: '💖' };
+  const POWER_COLORS = { shield: '#40c4ff', magnet: '#e040fb', x2: '#ffd600', boost: '#ff7043', revive: '#ff4081' };
+  const POWER_WEIGHTS = [['shield', 3], ['magnet', 3], ['x2', 2], ['boost', 2], ['revive', 1]];
   const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
-  canvas.width = W;
-  canvas.height = H;
+  let dpr = 1;
+  function resizeCanvas() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+  }
+  resizeCanvas();
 
   const fa = n => Math.floor(n).toLocaleString('fa-IR', { useGrouping: false });
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -32,36 +42,150 @@
     hard:   { base: 460, accel: 9, max: 1000 },
   };
 
+  // مأموریت‌ها: stat = کلید آمار تجمعی (یا best = بهترین امتیاز)
+  const MISSIONS = [
+    { id: 'coins50',   icon: '🪙', title: 'جمع‌آوری ۵۰ سکه',               stat: 'coins',       target: 50,   reward: 15 },
+    { id: 'coins300',  icon: '💰', title: 'جمع‌آوری ۳۰۰ سکه',              stat: 'coins',       target: 300,  reward: 60 },
+    { id: 'pass30',    icon: '🌵', title: 'عبور از ۳۰ مانع',               stat: 'passed',      target: 30,   reward: 15 },
+    { id: 'pass200',   icon: '🏃', title: 'عبور از ۲۰۰ مانع',              stat: 'passed',      target: 200,  reward: 60 },
+    { id: 'score200',  icon: '⭐', title: 'رسیدن به امتیاز ۲۰۰',            stat: 'best',        target: 200,  reward: 20 },
+    { id: 'score600',  icon: '🌟', title: 'رسیدن به امتیاز ۶۰۰',            stat: 'best',        target: 600,  reward: 60 },
+    { id: 'score1500', icon: '🏆', title: 'رسیدن به امتیاز ۱۵۰۰',           stat: 'best',        target: 1500, reward: 150 },
+    { id: 'power10',   icon: '⚡', title: 'جمع‌آوری ۱۰ قدرت ویژه',          stat: 'powers',      target: 10,   reward: 25 },
+    { id: 'double50',  icon: '🦘', title: '۵۰ بار پرش دوتایی',              stat: 'doubleJumps', target: 50,   reward: 15 },
+    { id: 'smash10',   icon: '🚀', title: 'له کردن ۱۰ مانع با سرعت‌دهنده',  stat: 'smashed',     target: 10,   reward: 40 },
+    { id: 'runs10',    icon: '🎮', title: 'انجام ۱۰ بازی',                  stat: 'runs',        target: 10,   reward: 20 },
+    { id: 'revive1',   icon: '💖', title: 'استفاده از نجات یک‌باره',         stat: 'revives',     target: 1,    reward: 20 },
+  ];
+
+  // دستاوردها: به‌صورت خودکار باز می‌شوند (بدون جایزهٔ سکه)
+  const ACHIEVEMENTS = [
+    { id: 'first',     icon: '🐾', title: 'اولین دو',      desc: 'یک بازی را تمام کن',              test: () => save.stats.runs >= 1 },
+    { id: 'night',     icon: '🌙', title: 'شب‌پرواز',      desc: 'تا دل شب بدو',                    test: () => save.stats.nights > 0 || g.run.nights > 0 },
+    { id: 'rich',      icon: '💎', title: 'ثروتمند',       desc: 'در مجموع ۵۰۰ سکه جمع کن',         test: () => save.stats.coins + (g.committed ? 0 : g.run.coins) >= 500 },
+    { id: 'tough',     icon: '🛡️', title: 'جان‌سخت',       desc: 'از نجات یک‌باره استفاده کن',       test: () => save.stats.revives > 0 || g.run.revives > 0 },
+    { id: 'smasher',   icon: '💥', title: 'بولدوزر',       desc: '۳ مانع را در یک بازی له کن',       test: () => g.run.smashed >= 3 },
+    { id: 'allpower',  icon: '🎁', title: 'همه‌فن‌حریف',   desc: 'هر ۵ قدرت را در یک بازی بگیر',     test: () => g.run.types.size >= 5 },
+    { id: 'hard800',   icon: '🔥', title: 'بی‌باک',        desc: 'در سطح سخت به ۸۰۰ برس',           test: () => g.d === DIFFS.hard && g.score >= 800 },
+    { id: 'marathon',  icon: '🏅', title: 'ماراتن',        desc: 'به امتیاز ۱۵۰۰ برس',              test: () => Math.max(save.best, g.score) >= 1500 },
+    { id: 'collector', icon: '🐱', title: 'کلکسیونر',      desc: 'همهٔ شخصیت‌ها را بخر',            test: () => save.owned.length >= CHARACTERS.length },
+  ];
+
   /* ---------- ذخیره‌سازی ---------- */
-  const DEFAULT_SAVE = { coins: 0, best: 0, owned: ['cat'], selected: 'cat', muted: false, difficulty: 'normal', scores: [] };
-  function loadSave() {
-    let s = {};
-    try { s = JSON.parse(localStorage.getItem('catRunnerSave') || '{}') || {}; } catch (e) {}
-    const d = Object.assign(JSON.parse(JSON.stringify(DEFAULT_SAVE)), s);
-    if (!Array.isArray(d.owned) || !d.owned.includes('cat')) d.owned = ['cat'];
-    if (!d.owned.includes(d.selected)) d.selected = 'cat';
-    if (!DIFFS[d.difficulty]) d.difficulty = 'normal';
-    if (!Array.isArray(d.scores)) d.scores = [];
+  // کلید ذخیره همان نسخهٔ ۱ است؛ فیلدهای قدیمی حفظ و فیلدهای جدید با مقدار پیش‌فرض اضافه می‌شوند.
+  const SAVE_KEY = 'catRunnerSave';
+  const STAT_KEYS = ['coins', 'passed', 'powers', 'doubleJumps', 'smashed', 'revives', 'nights', 'runs'];
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const clampInt = (v, def, max = 1e9) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : def);
+  const clamp01 = (v, def) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : def);
+  const bool = (v, def) => (typeof v === 'boolean' ? v : def);
+
+  function defaultSave() {
+    const stats = {};
+    STAT_KEYS.forEach(k => { stats[k] = 0; });
+    return {
+      ver: 2, coins: 0, best: 0, owned: ['cat'], selected: 'cat', difficulty: 'normal', scores: [],
+      muted: false, music: true, sfx: true, musicVol: 0.6, sfxVol: 0.8, vibrate: true,
+      stats, claimed: {}, achievements: {},
+    };
+  }
+
+  // هر ورودی (حافظهٔ مرورگر یا فایل واردشده) از این تابع می‌گذرد و به شکل امن و معتبر در می‌آید.
+  function normalizeSave(raw) {
+    const d = defaultSave();
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return d;
+    d.coins = clampInt(raw.coins, 0);
+    d.best = clampInt(raw.best, 0);
+    const known = new Set(CHARACTERS.map(c => c.id));
+    const owned = Array.isArray(raw.owned) ? raw.owned.filter(id => typeof id === 'string' && known.has(id)) : [];
+    d.owned = Array.from(new Set(['cat', ...owned]));
+    d.selected = d.owned.includes(raw.selected) ? raw.selected : 'cat';
+    d.difficulty = typeof raw.difficulty === 'string' && has(DIFFS, raw.difficulty) ? raw.difficulty : 'normal';
+    d.scores = Array.isArray(raw.scores)
+      ? raw.scores.filter(v => typeof v === 'number' && Number.isFinite(v) && v >= 0)
+        .map(v => clampInt(v, 0)).sort((a, b) => b - a).slice(0, 5) : [];
+    d.muted = bool(raw.muted, false);
+    d.music = bool(raw.music, true);
+    d.sfx = bool(raw.sfx, true);
+    d.vibrate = bool(raw.vibrate, true);
+    d.musicVol = clamp01(raw.musicVol, 0.6);
+    d.sfxVol = clamp01(raw.sfxVol, 0.8);
+    const st = raw.stats && typeof raw.stats === 'object' ? raw.stats : {};
+    STAT_KEYS.forEach(k => { d.stats[k] = clampInt(st[k], 0); });
+    const cl = raw.claimed && typeof raw.claimed === 'object' ? raw.claimed : {};
+    MISSIONS.forEach(m => { if (cl[m.id] === true) d.claimed[m.id] = true; });
+    const ac = raw.achievements && typeof raw.achievements === 'object' ? raw.achievements : {};
+    ACHIEVEMENTS.forEach(a => { if (ac[a.id] === true) d.achievements[a.id] = true; });
     return d;
   }
-  function persist() { try { localStorage.setItem('catRunnerSave', JSON.stringify(save)); } catch (e) {} }
+
+  function loadSave() {
+    let text = null, raw = null;
+    try { text = localStorage.getItem(SAVE_KEY); raw = JSON.parse(text || '{}'); } catch (e) { raw = null; }
+    // پیش از اولین ذخیرهٔ نسخهٔ ۲، یک نسخهٔ پشتیبان از ذخیرهٔ قدیمی نگه می‌داریم.
+    try {
+      if (text && raw && raw.ver !== 2 && !localStorage.getItem(SAVE_KEY + '_v1_backup')) {
+        localStorage.setItem(SAVE_KEY + '_v1_backup', text);
+      }
+    } catch (e) {}
+    return normalizeSave(raw);
+  }
+  function persist() { try { save.ver = 2; localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
   const save = loadSave();
+
+  function replaceSave(clean) {
+    Object.keys(save).forEach(k => { delete save[k]; });
+    Object.assign(save, clean);
+  }
+
+  // چک‌سام ساده (FNV-1a) فقط برای تشخیص فایل خراب؛ ضد تقلب نیست.
+  function checksum(str) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  }
+  function serializeSave() {
+    const data = JSON.parse(JSON.stringify(save));
+    return JSON.stringify({ app: 'cat-runner', version: 2, exported: new Date().toISOString(), sum: checksum(JSON.stringify(data)), data }, null, 2);
+  }
+  const MAX_IMPORT_BYTES = 200000;
+  function parseImport(text) {
+    if (typeof text !== 'string' || text.length > MAX_IMPORT_BYTES) return { error: 'حجم فایل نامعتبر است.' };
+    let obj;
+    try { obj = JSON.parse(text); } catch (e) { return { error: 'فایل JSON معتبر نیست.' }; }
+    if (!obj || typeof obj !== 'object' || obj.app !== 'cat-runner') return { error: 'این فایل مربوط به Cat Runner نیست.' };
+    if (!Number.isInteger(obj.version) || obj.version < 1 || obj.version > 2) return { error: 'نسخهٔ فایل پشتیبانی نمی‌شود.' };
+    const d = obj.data;
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return { error: 'داده‌های ذخیره در فایل پیدا نشد.' };
+    if (obj.sum !== undefined && obj.sum !== checksum(JSON.stringify(d))) return { error: 'فایل خراب یا ویرایش‌شده است.' };
+    for (const k of ['coins', 'best']) {
+      if (typeof d[k] !== 'number' || !Number.isFinite(d[k]) || d[k] < 0 || d[k] > 1e9) return { error: `مقدار «${k}» نامعتبر است.` };
+    }
+    if (!Array.isArray(d.owned) || d.owned.length > 50) return { error: 'فهرست شخصیت‌ها نامعتبر است.' };
+    if (!d.owned.every(id => typeof id === 'string' && CHARACTERS.some(c => c.id === id))) return { error: 'شخصیت ناشناخته در فایل وجود دارد.' };
+    if (d.difficulty !== undefined && !(typeof d.difficulty === 'string' && has(DIFFS, d.difficulty))) return { error: 'درجه سختی نامعتبر است.' };
+    if (d.scores !== undefined && (!Array.isArray(d.scores) || d.scores.length > 50)) return { error: 'فهرست امتیازها نامعتبر است.' };
+    return { data: normalizeSave(d) };
+  }
 
   /* ---------- صدا ---------- */
   let actx = null, music = null;
+  const sfxOn = () => !save.muted && save.sfx && save.sfxVol > 0.01;
+  const musicOn = () => !save.muted && save.music && save.musicVol > 0.01;
   function ensureAudio() {
     if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
     if (actx && actx.state === 'suspended') actx.resume();
   }
   function beep(f, d = 0.1, type = 'square', v = 0.07, slide = 0) {
-    if (save.muted || !actx) return;
-    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    if (!actx || !sfxOn()) return;
+    const t = actx.currentTime, o = actx.createOscillator(), gn = actx.createGain();
+    const vol = Math.max(0.002, v * save.sfxVol * 1.25);
     o.type = type;
     o.frequency.setValueAtTime(f, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d);
-    g.gain.setValueAtTime(v, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + d);
-    o.connect(g); g.connect(actx.destination);
+    gn.gain.setValueAtTime(vol, t);
+    gn.gain.exponentialRampToValueAtTime(0.001, t + d);
+    o.connect(gn); gn.connect(actx.destination);
     o.start(t); o.stop(t + d);
   }
   const sfx = {
@@ -75,15 +199,28 @@
     mile:  () => { beep(660, 0.1, 'triangle', 0.08); setTimeout(() => beep(990, 0.15, 'triangle', 0.08), 100); },
     buy:   () => { beep(600, 0.1, 'triangle', 0.08); setTimeout(() => beep(900, 0.15, 'triangle', 0.08), 90); },
     error: () => beep(150, 0.2, 'square', 0.06),
+    boost: () => { beep(300, 0.35, 'sawtooth', 0.07, 900); },
+    smash: () => beep(180, 0.12, 'sawtooth', 0.08, -90),
+    revive:() => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.14, 'triangle', 0.08), i * 80)); },
+    mission:() => { beep(784, 0.1, 'triangle', 0.07); setTimeout(() => beep(1175, 0.18, 'triangle', 0.07), 110); },
   };
+  function vibrate(pattern) {
+    if (save.vibrate && navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} }
+  }
   function startMusic() {
-    if (save.muted) return;
+    if (!musicOn()) return;
     try {
-      if (!music) { music = new Audio('background.mp3'); music.loop = true; music.volume = 0.3; }
+      if (!music) { music = new Audio('background.mp3'); music.loop = true; }
+      music.volume = save.musicVol * 0.5;
       const p = music.play(); if (p && p.catch) p.catch(() => {});
     } catch (e) {}
   }
   function stopMusic() { if (music) music.pause(); }
+  // موسیقی و افکت‌ها جدا از هم قابل تنظیم‌اند؛ muted همان قطع کلی (کلید M) است.
+  function applyAudio() {
+    if (music) music.volume = save.musicVol * 0.5;
+    if (!musicOn()) stopMusic(); else if (state === 'playing') startMusic();
+  }
 
   /* ---------- وضعیت بازی ---------- */
   let state = 'menu'; // menu | playing | paused | over
@@ -98,12 +235,16 @@
       d, t: 0, score: 0, coins: 0, speed: d.base,
       obstacles: [], items: [], particles: [],
       spawnIn: 700, shake: 0, flash: 0,
-      shield: false, inv: 0, magnet: 0, milestone: 0, bgx: 0, groundX: 0,
+      shield: false, inv: 0, magnet: 0, x2: 0, boost: 0, boostMul: 1, revive: false,
+      milestone: 0, bgx: 0, groundX: 0, checkIn: 0.5,
+      started: false, committed: false, result: null,
+      run: { coins: 0, passed: 0, powers: 0, doubleJumps: 0, smashed: 0, revives: 0, nights: 0, types: new Set() },
       player: { x: 100, y: GY, vy: 0, jumps: 0, grounded: true, ducking: false, run: 0 },
     };
   }
 
   function burst(x, y, color, n = 10, spd = 200) {
+    if (g.particles.length > 400) return;
     for (let i = 0; i < n; i++) {
       const a = rand(0, Math.PI * 2), s = rand(spd * 0.3, spd);
       g.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, life: rand(0.3, 0.7), max: 0.7, color, size: rand(2, 5) });
@@ -121,11 +262,19 @@
     p.vy = p.jumps === 0 ? -JUMP : -JUMP * 0.9;
     (p.jumps === 0 ? sfx.jump : sfx.jump2)();
     if (p.jumps === 0) dust(p.x + 20, GY);
+    if (p.jumps === 1) g.run.doubleJumps++;
     p.jumps++;
     p.grounded = false;
   }
 
   /* ---------- ساخت مانع و سکه ---------- */
+  function pickPower() {
+    const pool = POWER_WEIGHTS.filter(([t]) => !(t === 'revive' && g.revive));
+    let r = Math.random() * pool.reduce((a, [, w]) => a + w, 0);
+    for (const [t, w] of pool) { if ((r -= w) < 0) return t; }
+    return pool[0][0];
+  }
+
   function spawn() {
     const x = W + 40;
     const birdChance = g.score > 150 ? 0.25 : g.score > 60 ? 0.12 : 0;
@@ -149,8 +298,8 @@
       }
     }
     // پاورآپ
-    if (Math.random() < 0.09) {
-      g.items.push({ type: Math.random() < 0.5 ? 'shield' : 'magnet', x: x + o.w + 90, y: GY - 80, r: 16 });
+    if (Math.random() < 0.12) {
+      g.items.push({ type: pickPower(), x: x + o.w + 90, y: GY - 80, r: 16 });
     }
     g.spawnIn = g.speed * rand(0.95, 1.7);
   }
@@ -162,34 +311,123 @@
   }
   const overlap = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
 
+  // ذخیرهٔ نتیجهٔ دور (امتیاز، سکه، آمار مأموریت‌ها). فقط یک بار برای هر دور اجرا می‌شود.
+  function commitRun() {
+    if (!g || !g.started || g.committed) return g && g.result ? g.result : { score: 0, isRecord: false };
+    g.committed = true;
+    const score = Math.floor(g.score);
+    const isRecord = score > save.best;
+    if (isRecord) save.best = score;
+    save.coins = Math.min(1e9, save.coins + g.coins);
+    STAT_KEYS.forEach(k => { save.stats[k] = Math.min(1e9, save.stats[k] + (g.run[k] || 0)); });
+    save.stats.runs = Math.min(1e9, save.stats.runs + 1);
+    if (score > 0) {
+      save.scores.push(score);
+      save.scores.sort((a, b) => b - a);
+      save.scores = save.scores.slice(0, 5);
+    }
+    persist();
+    g.result = { score, isRecord };
+    return g.result;
+  }
+
   function die() {
     state = 'over';
-    sfx.die();
+    sfx.die(); vibrate([60, 40, 120]);
     stopMusic();
     g.shake = 0.6; g.flash = 0.8;
     const p = g.player;
     burst(p.x + 22, p.y - 22, '#ff5252', 24, 320);
-    const finalScore = Math.floor(g.score);
-    const isRecord = finalScore > save.best;
-    if (isRecord) save.best = finalScore;
-    save.coins += g.coins;
-    save.scores.push(finalScore);
-    save.scores.sort((a, b) => b - a);
-    save.scores = save.scores.slice(0, 5);
-    persist();
+    const res = commitRun();
+    checkProgress();
     $('hud').hidden = true;
     setTimeout(() => {
       if (state !== 'over') return;
-      $('goScore').textContent = fa(finalScore);
-      $('goCoins').textContent = fa(g.coins);
-      $('goBest').textContent = fa(save.best);
-      $('goRecord').hidden = !isRecord;
-      $('goScores').innerHTML = save.scores.map(s => `<li>${fa(s)}</li>`).join('');
+      fillGameOver(res);
       show('gameover');
     }, 650);
   }
 
+  function obBox(o) { return { l: o.x + 5, r: o.x + o.w - 5, t: o.y + 5, b: o.y + o.h - 3 }; }
+
+  // سرعت‌دهنده: مانع را می‌شکند
+  function smash(o) {
+    o.dead = true; o.counted = true;
+    g.run.passed++; g.run.smashed++;
+    g.score += 5;
+    burst(o.x + o.w / 2, o.y + o.h / 2, '#ff9800', 14, 280);
+    sfx.smash(); vibrate(10);
+    g.shake = Math.max(g.shake, 0.12);
+  }
+
+  // نجات یک‌باره: به‌جای مرگ، مانع‌های نزدیک پاک می‌شوند
+  function rescue() {
+    const p = g.player;
+    g.revive = false; g.inv = 2.5; g.run.revives++;
+    g.obstacles = g.obstacles.filter(o => o.x > p.x + 340 || o.x + o.w < p.x - 20);
+    p.vy = -520; p.grounded = false; p.jumps = 1;
+    burst(p.x + 22, p.y - 22, '#ff4081', 26, 340);
+    g.flash = 0.7; g.shake = 0.3;
+    sfx.revive(); vibrate([40, 30, 80]);
+    toast('نجات پیدا کردی!', '💖');
+  }
+
+  function collectPower(it) {
+    g.run.powers++; g.run.types.add(it.type);
+    sfx.power(); vibrate(15);
+    burst(it.x, it.y, POWER_COLORS[it.type] || '#fff', 12);
+    switch (it.type) {
+      case 'shield': g.shield = true; break;
+      case 'magnet': g.magnet = POWER_DUR.magnet; break;
+      case 'x2':     g.x2 = POWER_DUR.x2; break;
+      case 'boost':  g.boost = POWER_DUR.boost; g.flash = 0.5; g.shake = 0.25; sfx.boost(); vibrate([20, 20, 40]); break;
+      case 'revive': g.revive = true; sfx.revive(); break;
+    }
+  }
+
+  // مقدار زندهٔ آمار یک مأموریت (ذخیره‌شده + دور جاری)
+  function statValue(m) {
+    const live = g && g.started && !g.committed;
+    if (m.stat === 'best') return Math.max(save.best, live ? Math.floor(g.score) : 0);
+    return save.stats[m.stat] + (live ? (g.run[m.stat] || 0) : 0);
+  }
+  const claimableCount = () => MISSIONS.filter(m => !save.claimed[m.id] && statValue(m) >= m.target).length;
+
+  const announced = new Set();
+  function syncAnnounced() {
+    announced.clear();
+    MISSIONS.forEach(m => { if (statValue(m) >= m.target) announced.add(m.id); });
+  }
+  function checkProgress() {
+    let changed = false;
+    for (const m of MISSIONS) {
+      if (!save.claimed[m.id] && !announced.has(m.id) && statValue(m) >= m.target) {
+        announced.add(m.id);
+        sfx.mission(); toast(`مأموریت کامل شد: ${m.title}`, '🎯');
+      }
+    }
+    for (const a of ACHIEVEMENTS) {
+      if (!save.achievements[a.id] && a.test()) {
+        save.achievements[a.id] = true; changed = true;
+        sfx.mission(); toast(`دستاورد: ${a.title}`, a.icon);
+      }
+    }
+    if (changed) persist();
+  }
+
+  function toast(msg, icon) {
+    const box = $('toasts');
+    if (!box) return;
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = (icon ? icon + ' ' : '') + msg;
+    box.appendChild(el);
+    while (box.children.length > 3) box.firstChild.remove();
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2600);
+  }
+
   /* ---------- به‌روزرسانی ---------- */
+
   function updateParticles(dt) {
     for (const q of g.particles) {
       q.life -= dt; q.vy += 600 * dt; q.x += q.vx * dt; q.y += q.vy * dt;
@@ -202,11 +440,22 @@
   function update(dt) {
     g.t += dt;
     g.speed = Math.min(g.d.max, g.speed + g.d.accel * dt);
-    g.score += (g.speed * dt) / 18;
-    g.bgx += g.speed * 0.15 * dt;
-    g.groundX = (g.groundX + g.speed * dt) % 40;
+    if (g.boost > 0) {
+      g.boost -= dt;
+      if (g.boost <= 0) { g.boost = 0; g.inv = Math.max(g.inv, 1.2); }
+    }
+    g.boostMul += ((g.boost > 0 ? BOOST_MUL : 1) - g.boostMul) * Math.min(1, dt * 6);
+    if (g.boost <= 0 && g.boostMul < 1.01) g.boostMul = 1;
+    const sp = g.speed * g.boostMul; // سرعت مؤثر (با احتساب سرعت‌دهنده)
+    g.score += ((sp * dt) / 18) * (g.x2 > 0 ? 2 : 1);
+    g.bgx += sp * 0.15 * dt;
+    g.groundX = (g.groundX + sp * dt) % 40;
     if (g.inv > 0) g.inv -= dt;
     if (g.magnet > 0) g.magnet -= dt;
+    if (g.x2 > 0) g.x2 -= dt;
+    if (nightFactor() > 0.85) g.run.nights = 1;
+    g.checkIn -= dt;
+    if (g.checkIn <= 0) { g.checkIn = 0.5; checkProgress(); }
 
     // جایزهٔ هر ۱۰۰ امتیاز
     const m = Math.floor(g.score / 100);
@@ -224,35 +473,46 @@
       if (!p.grounded) { sfx.land(); dust(p.x + 20, GY); }
       p.y = GY; p.vy = 0; p.grounded = true; p.jumps = 0;
     }
-    p.run += dt * g.speed / 400;
+    p.run += dt * sp / 400;
+    if (g.boost > 0 && g.particles.length < 400) {
+      const cols = ['#ff9800', '#ffeb3b', '#ff5722'];
+      for (let i = 0; i < 2; i++) {
+        g.particles.push({ x: p.x + 2, y: p.y - rand(4, 38), vx: -rand(160, 320), vy: rand(-50, 50), life: 0.3, max: 0.3, color: cols[(Math.random() * 3) | 0], size: rand(3, 6) });
+      }
+    }
 
     // ساخت مانع
-    g.spawnIn -= g.speed * dt;
+    g.spawnIn -= sp * dt;
     if (g.spawnIn <= 0) spawn();
 
     // حرکت
-    for (const o of g.obstacles) o.x -= g.speed * dt;
-    g.obstacles = g.obstacles.filter(o => o.x + o.w > -60);
+    for (const o of g.obstacles) {
+      o.x -= sp * dt;
+      if (!o.counted && o.x + o.w < g.player.x) { o.counted = true; g.run.passed++; }
+    }
+    g.obstacles = g.obstacles.filter(o => !o.dead && o.x + o.w > -60);
 
     const pb = playerBox();
     const pcx = p.x + 22, pcy = p.y - (p.ducking ? 12 : 22);
     for (const it of g.items) {
-      it.x -= g.speed * dt;
+      it.x -= sp * dt;
       if (it.type === 'coin' && g.magnet > 0) {
         const dx = pcx - it.x, dy = pcy - it.y, dist = Math.hypot(dx, dy);
         if (dist < 240 && dist > 1) { it.x += (dx / dist) * 600 * dt; it.y += (dy / dist) * 600 * dt; }
       }
       if (!it.done && Math.hypot(pcx - it.x, pcy - it.y) < it.r + 22) {
         it.done = true;
-        if (it.type === 'coin') { g.coins++; sfx.coin(); burst(it.x, it.y, '#ffd600', 5, 120); }
-        else if (it.type === 'shield') { g.shield = true; sfx.power(); burst(it.x, it.y, '#40c4ff', 10); }
-        else if (it.type === 'magnet') { g.magnet = 8; sfx.power(); burst(it.x, it.y, '#e040fb', 10); }
+        if (it.type === 'coin') { g.coins++; g.run.coins++; sfx.coin(); burst(it.x, it.y, '#ffd600', 5, 120); }
+        else collectPower(it);
       }
     }
     g.items = g.items.filter(it => !it.done && it.x > -40);
 
     // برخورد با مانع
-    if (g.inv <= 0) {
+    if (g.boost > 0) {
+      // حین سرعت‌دهنده شکست‌ناپذیر است و مانع‌ها را خرد می‌کند
+      for (const o of g.obstacles) if (!o.dead && overlap(pb, obBox(o))) smash(o);
+    } else if (g.inv <= 0) {
       for (const o of g.obstacles) {
         const ob = { l: o.x + 5, r: o.x + o.w - 5, t: o.y + 5, b: o.y + o.h - 3 };
         if (overlap(pb, ob)) {
@@ -261,7 +521,8 @@
             burst(o.x + o.w / 2, o.y + o.h / 2, '#40c4ff', 16, 250);
             g.obstacles = g.obstacles.filter(x => x !== o);
             g.shake = 0.2;
-          } else { die(); return; }
+          } else if (g.revive) { rescue(); }
+          else { die(); return; }
           break;
         }
       }
@@ -270,13 +531,38 @@
     updateHud();
   }
 
+  const hudCache = Object.create(null);
+  const powerChips = {};
+  function initHud() {
+    document.querySelectorAll('#powerBar [data-p]').forEach(el => {
+      powerChips[el.dataset.p] = { el, time: el.querySelector('b'), bar: el.querySelector('.bar') };
+    });
+  }
+  function setNum(id, n) {
+    n = Math.floor(n);
+    if (hudCache[id] !== n) { hudCache[id] = n; $(id).textContent = fa(n); }
+  }
   function updateHud() {
-    $('hudScore').textContent = fa(g.score);
-    $('hudBest').textContent = fa(Math.max(save.best, g.score));
-    $('hudCoins').textContent = fa(g.coins);
-    $('hudShield').hidden = !g.shield;
-    $('hudMagnet').hidden = g.magnet <= 0;
-    if (g.magnet > 0) $('hudMagnetTime').textContent = fa(Math.ceil(g.magnet));
+    setNum('hudScore', g.score);
+    setNum('hudBest', Math.max(save.best, g.score));
+    setNum('hudCoins', g.coins);
+    const x2on = g.x2 > 0;
+    if (hudCache.x2on !== x2on) { hudCache.x2on = x2on; $('hudScoreChip').classList.toggle('x2', x2on); }
+    const fr = {
+      shield: g.shield ? 1 : 0, revive: g.revive ? 1 : 0,
+      magnet: g.magnet / POWER_DUR.magnet, x2: g.x2 / POWER_DUR.x2, boost: g.boost / POWER_DUR.boost,
+    };
+    for (const k in powerChips) {
+      const c = powerChips[k], f = Math.max(0, Math.min(1, fr[k]));
+      const on = f > 0;
+      if (c.el.hidden === on) c.el.hidden = !on;
+      if (!on) continue;
+      c.bar.style.transform = `scaleX(${f.toFixed(2)})`;
+      if (c.time) {
+        const sec = Math.ceil(f * POWER_DUR[k]);
+        if (hudCache['t' + k] !== sec) { hudCache['t' + k] = sec; c.time.textContent = fa(sec); }
+      }
+    }
   }
 
   /* ---------- رسم ---------- */
@@ -372,8 +658,10 @@
       ctx.restore();
     } else {
       const bob = Math.sin(g.t * 4) * 4;
+      ctx.fillStyle = (POWER_COLORS[it.type] || '#ffffff') + '33';
+      ctx.beginPath(); ctx.arc(it.x, it.y + bob, 20 + Math.sin(g.t * 6) * 2, 0, 7); ctx.fill();
       ctx.font = `28px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(it.type === 'shield' ? '🛡️' : '🧲', it.x, it.y + bob);
+      ctx.fillText(POWER_ICONS[it.type] || '❓', it.x, it.y + bob);
     }
   }
 
@@ -386,6 +674,12 @@
 
     const char = CHARACTERS.find(c => c.id === save.selected) || CHARACTERS[0];
     const bob = p.grounded && state !== 'over' ? -Math.abs(Math.sin(p.run * 10)) * 4 : 0;
+    if (g.boostMul > 1.1) { // رد (ghost) هنگام سرعت‌دهنده
+      ctx.save();
+      ctx.font = `44px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      for (let k = 1; k <= 3; k++) { ctx.globalAlpha = 0.28 / k; ctx.fillText(char.emoji, p.x + 22 - k * 18, p.y + bob + 4); }
+      ctx.restore();
+    }
     ctx.save();
     ctx.translate(p.x + 22, p.y + bob);
     if (!p.grounded) ctx.rotate(Math.max(-0.3, Math.min(0.4, p.vy / 2500)));
@@ -394,6 +688,14 @@
     ctx.fillText(char.emoji, 0, 4);
     ctx.restore();
 
+    if (g.x2 > 0) { // هالهٔ طلایی امتیاز دوبرابر
+      ctx.fillStyle = `rgba(255,214,0,${0.14 + 0.08 * Math.sin(g.t * 8)})`;
+      ctx.beginPath(); ctx.arc(p.x + 22, p.y - 22, 30, 0, 7); ctx.fill();
+    }
+    if (g.revive) { // قلب بالای سر = نجات یک‌باره فعال است
+      ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('💖', p.x + 22, p.y - 62 + Math.sin(g.t * 5) * 3);
+    }
     if (g.shield) {
       ctx.strokeStyle = `rgba(64,196,255,${0.6 + 0.3 * Math.sin(g.t * 8)})`;
       ctx.fillStyle = 'rgba(64,196,255,.18)'; ctx.lineWidth = 3;
@@ -401,13 +703,34 @@
     }
   }
 
+  // خطوط سرعت و درخشش نارنجی لبه‌ها هنگام سرعت‌دهنده
+  function drawBoostFx() {
+    const k = Math.min(1, (g.boostMul - 1) / (BOOST_MUL - 1));
+    if (k < 0.02) return;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * k})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 16; i++) {
+      const y = 20 + ((i * 53) % (GY - 30)), len = 60 + (i % 4) * 30;
+      const x = W - ((g.t * 1400 + i * 211) % (W + len));
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+    }
+    const gr = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.65);
+    gr.addColorStop(0, 'rgba(255,120,0,0)');
+    gr.addColorStop(1, `rgba(255,120,0,${0.28 * k})`);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
   function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const n = nightFactor();
     ctx.save();
     if (g.shake > 0) ctx.translate(rand(-1, 1) * g.shake * 14, rand(-1, 1) * g.shake * 14);
     drawBackground(n);
+    drawBoostFx();
     g.items.forEach(drawItem);
-    g.obstacles.forEach(drawObstacle);
+    g.obstacles.forEach(o => { if (!o.dead) drawObstacle(o); });
     drawPlayer();
     for (const q of g.particles) {
       ctx.globalAlpha = Math.max(0, q.life / q.max);
@@ -420,13 +743,17 @@
   }
 
   /* ---------- حلقهٔ اصلی ---------- */
-  let last = 0;
+  let last = 0, shownState = null;
   function frame(ts) {
     const dt = Math.min(0.05, (ts - last) / 1000 || 0);
     last = ts;
     if (state === 'playing') update(dt);
     else if (state === 'over') updateParticles(dt);
     else if (state === 'menu') { g.t += dt; g.bgx += 25 * dt; g.groundX = (g.groundX + 120 * dt) % 40; g.player.run += dt; }
+    if (state !== shownState) { // حین بازی: جلوگیری از اسکرول/زوم لمسی
+      shownState = state;
+      document.body.classList.toggle('playing', state === 'playing');
+    }
     render();
     requestAnimationFrame(frame);
   }
@@ -438,10 +765,12 @@
   function refreshMenu() {
     document.querySelectorAll('[data-bind="best"]').forEach(e => e.textContent = fa(save.best));
     document.querySelectorAll('[data-bind="coins"]').forEach(e => e.textContent = fa(save.coins));
-    $('difficulty').value = save.difficulty;
-    document.querySelectorAll('[data-action="mute"]').forEach(b => {
-      b.textContent = (save.muted ? '🔇' : '🔊') + (b.id === 'menuMute' ? ' صدا' : '');
-    });
+    const n = claimableCount();
+    document.querySelectorAll('[data-bind="claimable"]').forEach(e => { e.textContent = fa(n); e.hidden = n === 0; });
+    document.querySelectorAll('#difficulty [data-d]').forEach(b => b.classList.toggle('active', b.dataset.d === save.difficulty));
+    document.querySelectorAll('[data-action="mute"]').forEach(b => { b.textContent = save.muted ? '🔇' : '🔊'; });
+    const ch = CHARACTERS.find(c => c.id === save.selected) || CHARACTERS[0];
+    $('menuHero').textContent = ch.emoji;
   }
   function renderShop() {
     const cur = CHARACTERS.find(c => c.id === save.selected);
@@ -463,6 +792,7 @@
   }
 
   function backToMenu() {
+    commitRun();
     state = 'menu'; stopMusic(); newGame();
     $('hud').hidden = true;
     refreshMenu(); show('menu');
@@ -470,7 +800,9 @@
   function startGame() {
     ensureAudio();
     if (document.activeElement) document.activeElement.blur();
+    commitRun(); // اگر دور قبلی (مثلاً از صفحهٔ توقف) هنوز ذخیره نشده، ذخیره شود
     newGame();
+    g.started = true;
     state = 'playing';
     show(null);
     $('hud').hidden = false;
@@ -479,7 +811,10 @@
   }
   function pauseGame() {
     if (state !== 'playing') return;
-    state = 'paused'; stopMusic(); show('pause');
+    state = 'paused'; stopMusic();
+    $('pauseScore').textContent = fa(g.score);
+    $('pauseCoins').textContent = fa(g.coins);
+    show('pause');
   }
   function resumeGame() {
     if (state !== 'paused') return;
@@ -506,7 +841,141 @@
       return;
     }
     persist(); renderShop();
+    checkProgress();
   }
+
+  /* ---------- مأموریت‌ها و دستاوردها ---------- */
+  let missionTab = 'missions';
+  function renderMissions(tab) {
+    if (tab) missionTab = tab;
+    document.querySelectorAll('#missions [data-action="tab"]').forEach(b => b.classList.toggle('active', b.dataset.tab === missionTab));
+    $('missionCoins').textContent = fa(save.coins);
+    $('claimAllBtn').hidden = missionTab !== 'missions';
+    const box = $('missionList');
+    box.innerHTML = '';
+    if (missionTab === 'missions') {
+      MISSIONS.forEach(m => {
+        const val = Math.min(m.target, statValue(m)), done = val >= m.target, claimed = !!save.claimed[m.id];
+        const row = document.createElement('div');
+        row.className = 'mission' + (claimed ? ' claimed' : done ? ' done' : '');
+        row.innerHTML = `<span class="m-icon">${m.icon}</span><div class="m-body"><div class="m-title">${m.title}</div>` +
+          `<div class="bar-track"><i style="width:${Math.round((val / m.target) * 100)}%"></i></div><small>${fa(val)} / ${fa(m.target)}</small></div>`;
+        const btn = document.createElement('button');
+        if (claimed) { btn.textContent = '✔ دریافت شد'; btn.disabled = true; }
+        else if (done) { btn.textContent = `دریافت 🪙 ${fa(m.reward)}`; btn.className = 'primary'; btn.dataset.action = 'claim'; btn.dataset.id = m.id; }
+        else { btn.textContent = `🪙 ${fa(m.reward)}`; btn.disabled = true; }
+        row.appendChild(btn);
+        box.appendChild(row);
+      });
+    } else {
+      ACHIEVEMENTS.forEach(a => {
+        const on = !!save.achievements[a.id];
+        const row = document.createElement('div');
+        row.className = 'mission ach' + (on ? ' done' : ' locked');
+        row.innerHTML = `<span class="m-icon">${on ? a.icon : '🔒'}</span><div class="m-body"><div class="m-title">${a.title}</div><small>${a.desc}</small></div>`;
+        box.appendChild(row);
+      });
+    }
+  }
+  // جایزه فقط یک بار: پرچم claimed قبل از افزودن سکه ثبت می‌شود.
+  function claimMission(id, quiet) {
+    const m = MISSIONS.find(x => x.id === id);
+    if (!m || save.claimed[m.id] || statValue(m) < m.target) return false;
+    save.claimed[m.id] = true;
+    save.coins = Math.min(1e9, save.coins + m.reward);
+    persist();
+    if (!quiet) { sfx.buy(); vibrate(20); toast(`+${fa(m.reward)} سکه`, '🪙'); }
+    return true;
+  }
+  function claimAll() {
+    let sum = 0, n = 0;
+    MISSIONS.forEach(m => { if (claimMission(m.id, true)) { sum += m.reward; n++; } });
+    if (n) { sfx.buy(); vibrate(20); toast(`+${fa(sum)} سکه از ${fa(n)} مأموریت`, '🎁'); }
+    renderMissions(); refreshMenu();
+  }
+
+  /* ---------- صفحهٔ پایان ---------- */
+  function countUp(el, to, ms = 700) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || to <= 0) { el.textContent = fa(to); return; }
+    const t0 = performance.now();
+    const step = now => {
+      const k = Math.min(1, (now - t0) / ms);
+      el.textContent = fa(to * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  function fillGameOver(res) {
+    countUp($('goScore'), res.score);
+    countUp($('goCoins'), g.coins, 500);
+    countUp($('goPassed'), g.run.passed, 500);
+    $('goBest').textContent = fa(save.best);
+    $('goRecord').hidden = !res.isRecord;
+    $('goScores').innerHTML = save.scores.map(s => `<li>${fa(s)}</li>`).join('');
+    const n = claimableCount();
+    $('goHint').hidden = n === 0;
+    if (n) $('goHint').textContent = `🎯 ${fa(n)} مأموریت آمادهٔ دریافت جایزه است`;
+  }
+
+  /* ---------- تنظیمات و ذخیره (خروجی/ورودی JSON) ---------- */
+  function renderSettings() {
+    $('optMusic').checked = save.music;
+    $('optSfx').checked = save.sfx;
+    $('optVibrate').checked = save.vibrate;
+    $('volMusic').value = Math.round(save.musicVol * 100);
+    $('volSfx').value = Math.round(save.sfxVol * 100);
+    $('dataBox').hidden = state === 'paused'; // وسط بازی جایگزینی ذخیره مجاز نیست
+    $('dataMsg').textContent = '';
+  }
+  function bindSettings() {
+    $('optMusic').addEventListener('change', e => { save.music = e.target.checked; persist(); applyAudio(); });
+    $('optSfx').addEventListener('change', e => { save.sfx = e.target.checked; persist(); sfx.coin(); });
+    $('optVibrate').addEventListener('change', e => { save.vibrate = e.target.checked; persist(); vibrate(30); });
+    $('volMusic').addEventListener('input', e => { save.musicVol = clamp01(Number(e.target.value) / 100, 0.6); applyAudio(); });
+    $('volMusic').addEventListener('change', () => persist());
+    $('volSfx').addEventListener('input', e => { save.sfxVol = clamp01(Number(e.target.value) / 100, 0.8); });
+    $('volSfx').addEventListener('change', () => { persist(); ensureAudio(); sfx.coin(); });
+    $('importFile').addEventListener('change', e => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (f) importFile(f);
+    });
+  }
+  function exportSave() {
+    const blob = new Blob([serializeSave()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cat-runner-save-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    $('dataMsg').textContent = '✅ فایل ذخیره ساخته شد.';
+  }
+  function importFile(file) {
+    const msg = $('dataMsg');
+    if (file.size > MAX_IMPORT_BYTES) { msg.textContent = '❌ حجم فایل بیش از حد مجاز است.'; sfx.error(); return; }
+    const r = new FileReader();
+    r.onerror = () => { msg.textContent = '❌ خواندن فایل ناموفق بود.'; };
+    r.onload = () => {
+      const res = parseImport(String(r.result));
+      if (res.error) { msg.textContent = '❌ ' + res.error; sfx.error(); return; }
+      const d = res.data;
+      const ok = window.confirm(`ذخیرهٔ فعلی با این فایل جایگزین شود؟\nرکورد: ${fa(d.best)} | سکه: ${fa(d.coins)} | شخصیت‌ها: ${fa(d.owned.length)}`);
+      if (!ok) return;
+      try { localStorage.setItem(SAVE_KEY + '_backup', JSON.stringify(save)); } catch (e) {} // برگشت‌پذیر
+      replaceSave(d);
+      persist(); syncAnnounced(); applyAudio(); refreshMenu(); renderSettings();
+      msg.textContent = '✅ ذخیره با موفقیت بازیابی شد.';
+      sfx.buy();
+    };
+    r.readAsText(file);
+  }
+
+  /* ---------- اکشن‌های دکمه‌ها ---------- */
+  let returnTo = 'menu';
+  const currentScreen = () => { const a = document.querySelector('.screen.active'); return a ? a.id : 'menu'; };
+  function openScreen(name, render) { returnTo = currentScreen(); if (render) render(); show(name); }
 
   const actions = {
     start: startGame,
@@ -516,17 +985,24 @@
     pause: pauseGame,
     resume: resumeGame,
     mute: toggleMute,
+    settings: () => openScreen('settings', renderSettings),
+    missions: () => openScreen('missions', () => renderMissions()),
+    back: () => { refreshMenu(); show(returnTo); },
+    tab: b => renderMissions(b.dataset.tab),
+    claim: b => { claimMission(b.dataset.id); renderMissions(); refreshMenu(); },
+    claimAll,
+    diff: b => { if (has(DIFFS, b.dataset.d)) { save.difficulty = b.dataset.d; persist(); refreshMenu(); } },
+    export: exportSave,
+    import: () => $('importFile').click(),
   };
 
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-action]');
-    if (!b) return;
+    if (!b || b.disabled) return;
     if (b.dataset.action === 'shopItem') return shopItem(b.dataset.id);
     const fn = actions[b.dataset.action];
-    if (fn) fn();
+    if (fn) fn(b);
   });
-
-  $('difficulty').addEventListener('change', e => { save.difficulty = e.target.value; persist(); });
 
   /* ---------- ورودی‌ها ---------- */
   document.addEventListener('keydown', e => {
@@ -564,6 +1040,14 @@
 
   /* ---------- شروع ---------- */
   newGame();
+  initHud();
+  bindSettings();
+  applyAudio();
+  syncAnnounced();
   refreshMenu();
+  document.addEventListener('pointerdown', ensureAudio, { once: true });
+  $('touchControls').addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('pagehide', e => { if (!e.persisted) commitRun(); }); // سکه/آمار دور نیمه‌تمام از بین نرود
+  window.addEventListener('resize', () => { if (Math.min(2, window.devicePixelRatio || 1) !== dpr) resizeCanvas(); });
   requestAnimationFrame(frame);
 })();

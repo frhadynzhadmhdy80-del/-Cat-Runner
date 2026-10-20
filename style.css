@@ -121,3 +121,157 @@ button.primary:hover { background: #0277bd; }
 
 .scores { text-align: right; margin: 8px 0; }
 .scores ol { margin: 4px 0; padding-inline-start: 26px; }
+
+/* =====================================================================
+   v2.0 — رابط حرفه‌ای‌تر، انیمیشن روان، بهینه‌سازی موبایل
+   ===================================================================== */
+:root { --blue: #0288d1; --blue-d: #0277bd; --orange: #ff9800; }
+
+[hidden] { display: none !important; }
+
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-touch-callout: none;
+}
+body.playing { touch-action: none; overscroll-behavior: none; }
+
+button, select { -webkit-tap-highlight-color: transparent; }
+button:disabled { opacity: .55; cursor: default; transform: none; background: #f1f5f8; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+button.primary {
+  background: linear-gradient(135deg, #039be5, var(--blue-d));
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(2, 136, 209, .35);
+}
+button.big { width: 100%; font-size: 20px; padding: 14px; margin: 10px 0 6px; }
+
+/* ---------- صفحه‌ها ---------- */
+.screen {
+  align-items: flex-start;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: fade .2s ease-out;
+}
+@keyframes fade { from { opacity: 0; } }
+.panel {
+  margin: auto;
+  position: relative;
+  border-radius: 22px;
+  padding: 22px 20px;
+  background: linear-gradient(#fff, #f4fbff);
+}
+.panel h3 { margin: 6px 0; color: var(--blue-d); }
+.screen.active .panel > * { animation: rise .35s ease-out both; }
+.screen.active .panel > :nth-child(2) { animation-delay: .04s; }
+.screen.active .panel > :nth-child(3) { animation-delay: .08s; }
+.screen.active .panel > :nth-child(4) { animation-delay: .12s; }
+.screen.active .panel > :nth-child(5) { animation-delay: .16s; }
+.screen.active .panel > :nth-child(6) { animation-delay: .2s; }
+.screen.active .panel > :nth-child(n+7) { animation-delay: .24s; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+
+.hero { font-size: 72px; line-height: 1.1; animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-8px) rotate(-4deg); } }
+.ver { font-size: 12px; color: var(--orange); font-weight: normal; }
+.corner { position: absolute; top: 10px; left: 10px; margin: 0; z-index: 1; }
+
+.stats-row { display: flex; gap: 8px; margin: 10px 0; }
+.stat { flex: 1; background: #e8f6ff; border-radius: 12px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; }
+.stat small { color: #567; font-size: 12px; }
+.stat b { font-size: 20px; color: var(--blue-d); }
+
+.seg { display: flex; background: #e8f6ff; border-radius: 12px; padding: 3px; margin: 8px 0; }
+.seg button { flex: 1; margin: 0; border: none; background: transparent; padding: 8px; border-radius: 10px; }
+.seg button.active { background: var(--blue); color: #fff; box-shadow: 0 2px 6px rgba(2, 136, 209, .4); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.grid2 button { margin: 0; }
+.btns.col { flex-direction: column; }
+.btns.col button { margin: 4px 0; }
+
+.badge { background: #e53935; color: #fff; border-radius: 999px; padding: 0 7px; font-size: 12px; margin-inline-start: 4px; }
+.hint-btn { background: #fff3e0; border-color: var(--orange); color: #e65100; width: 100%; margin: 6px 0; }
+.record { animation: pulse .8s ease-in-out infinite alternate; }
+
+/* ---------- قدرت‌ها در HUD ---------- */
+#powerBar { flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none; }
+.chip.power { position: relative; overflow: hidden; padding-bottom: 7px; animation: pop .2s ease-out; }
+.chip.power .bar {
+  position: absolute; right: 0; bottom: 0; left: 0; height: 3px;
+  background: #e65100; transform-origin: right; transform: scaleX(1);
+}
+.chip.power[data-p="boost"] { background: rgba(255, 112, 67, .92); color: #fff; }
+.chip.power[data-p="boost"] .bar { background: #fff; }
+.chip.power[data-p="x2"] { background: rgba(255, 214, 0, .95); }
+.chip.power[data-p="revive"] { background: rgba(255, 64, 129, .9); color: #fff; }
+.chip.power[data-p="shield"] { background: rgba(64, 196, 255, .92); }
+.chip.power[data-p="magnet"] { background: rgba(224, 64, 251, .85); color: #fff; }
+#hudScoreChip.x2 { background: rgba(255, 214, 0, .95); box-shadow: 0 0 10px rgba(255, 193, 7, .9); }
+
+/* ---------- مأموریت‌ها ---------- */
+.tabs { display: flex; gap: 6px; justify-content: center; }
+.tabs button { margin: 0; flex: 1; }
+.tabs button.active { background: var(--blue); color: #fff; }
+.mission-list { margin: 10px 0; display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow: auto; text-align: right; }
+.mission { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: #f1f7fb; border: 2px solid transparent; }
+.mission.done { background: #fff8e1; border-color: var(--orange); }
+.mission.claimed { background: #e8f5e9; }
+.mission.locked { opacity: .55; }
+.mission button { margin: 0; padding: 8px 10px; font-size: 14px; white-space: nowrap; }
+.m-icon { font-size: 28px; }
+.m-body { flex: 1; min-width: 0; }
+.m-title { font-weight: bold; font-size: 14px; }
+.m-body small { color: #567; }
+.bar-track { height: 7px; background: #d6e4ec; border-radius: 99px; overflow: hidden; margin: 4px 0; }
+.bar-track i { display: block; height: 100%; background: linear-gradient(90deg, #29b6f6, #0288d1); border-radius: 99px; transition: width .4s; }
+
+/* ---------- تنظیمات ---------- */
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px; border-bottom: 1px solid #e3edf3; text-align: right; }
+.set-row input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--blue); }
+.set-row input[type="range"] { flex: 1; max-width: 180px; accent-color: var(--blue); }
+.data-box { margin: 12px 0; padding: 8px; background: #f1f7fb; border-radius: 14px; }
+
+/* ---------- اعلان‌ها ---------- */
+#toasts {
+  position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  z-index: 50; display: flex; flex-direction: column; gap: 6px; width: min(92vw, 420px); pointer-events: none;
+}
+.toast {
+  background: #263238; color: #fff; padding: 10px 14px; border-radius: 12px; text-align: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35); animation: toast-in .25s ease-out; transition: opacity .3s, transform .3s;
+}
+.toast.out { opacity: 0; transform: translateY(-8px); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-10px); } }
+@keyframes pop { from { transform: scale(.7); opacity: 0; } }
+
+/* ---------- موبایل ---------- */
+#touchControls { padding: 10px calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left)); touch-action: none; }
+.big-btn { touch-action: none; user-select: none; -webkit-user-select: none; min-height: 72px; border-radius: 18px; box-shadow: 0 4px 10px rgba(0, 0, 0, .15); }
+#jumpBtn { order: -1; background: linear-gradient(135deg, #039be5, var(--blue-d)); color: #fff; border-color: transparent; }
+.big-btn:active { transform: scale(.94); }
+
+@media (max-width: 480px) {
+  .title { font-size: 20px; margin: 6px 0; }
+  .panel { padding: 16px 12px; border-radius: 18px; }
+  .hero { font-size: 56px; }
+  .chip { font-size: 12px; padding: 3px 8px; }
+  .mission { padding: 6px 8px; }
+  .m-icon { font-size: 24px; }
+}
+/* گوشی در حالت افقی: بازی تمام‌صفحه و دکمه‌ها روی بازی */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  .title, .hint { display: none; }
+  #stage { width: min(100%, calc(100vh * 800 / 360)); border-radius: 0; box-shadow: none; }
+  #touchControls {
+    position: fixed; left: 0; right: 0; bottom: calc(6px + env(safe-area-inset-bottom));
+    padding: 0 calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));
+    justify-content: space-between; pointer-events: none; z-index: 5;
+  }
+  .big-btn { flex: none; width: 120px; min-height: 64px; padding: 8px; opacity: .78; pointer-events: auto; }
+  .screen { padding: 6px; }
+  .panel { max-height: 96vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

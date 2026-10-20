@@ -1,6 +1,3 @@
-[README.md](https://github.com/user-attachments/files/33727477/README.md)
-
-mahdi fn
 # 🐱 گربه دونده | Cat Runner — نسخه ۲.۰
 
 یک بازی ساده و فان برای مرورگر؛ گربه می‌دود، می‌پرد و از موانع رد می‌شود.
@@ -26,3 +23,16 @@ mahdi fn
 ## اجرا
 فایل `index.html` را در مرورگر باز کنید.
 
+## انتشار روی GitHub Pages
+1. فایل‌های `index.html`، `style.css`، `game.js`، `README.md` (و `logo.png` / `background.mp3` در صورت وجود) را در ریشهٔ مخزن جایگزین کنید.
+2. `git add . && git commit -m "v2.0" && git push`
+3. در GitHub: Settings → Pages → Branch: `main` / root. چند دقیقه بعد آدرس `https://<username>.github.io/my-game/` به‌روز می‌شود.
+4. اگر نسخهٔ قدیمی دیده شد، یک بار Hard Refresh (Ctrl+Shift+R) بزنید.
+
+ذخیرهٔ بازی در مرورگر و به‌ازای هر دامنه است؛ برای انتقال بین دستگاه‌ها از «خروجی JSON» و «بازیابی از فایل» در تنظیمات استفاده کنید.
+
+## ساختار
+`index.html` · `style.css` · `game.js` · `background.mp3` (اختیاری) · `logo.png` (اختیاری)
+
+## سازنده
+مهدی فرهادی نژاد
