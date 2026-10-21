@@ -4,6 +4,8 @@
   const $ = id => document.getElementById(id);
   const W = 800, H = 360, GROUND_H = 60, GY = H - GROUND_H;
   const GRAV = 2200, JUMP = 760;
+  const VERSION = '2.1.0 Beta';
+  const VERSION_FA = 'نسخه ۲.۱.۰ بتا';
   const POWER_DUR = { magnet: 8, x2: 10, boost: 5 };
   const BOOST_MUL = 1.6;
   const POWER_ICONS = { shield: '🛡️', magnet: '🧲', x2: '✨', boost: '🚀', revive: '💖' };
@@ -27,22 +29,43 @@
   const mix = (c1, c2, t) => `rgb(${lerp(c1[0], c2[0], t) | 0},${lerp(c1[1], c2[1], t) | 0},${lerp(c1[2], c2[2], t) | 0})`;
 
   /* ---------- داده‌ها ---------- */
+  // perk: اثر واقعی روی بازی (فقط برای شخصیت انتخاب‌شده)؛ meters: نمایش ۶ ویژگی (۱ تا ۵، ۳ = پایه)
+  const RARITY = { common: 'معمولی', rare: 'کمیاب', epic: 'حماسی', legendary: 'افسانه‌ای' };
+  const METER_LABELS = ['پرش', 'سکه', 'شانس', 'دوام', 'امتیاز', 'قدرت'];
   const CHARACTERS = [
-    { id: 'cat',     name: 'گربه',    emoji: '🐱', price: 0 },
-    { id: 'dog',     name: 'سگ',      emoji: '🐶', price: 30 },
-    { id: 'rabbit',  name: 'خرگوش',   emoji: '🐰', price: 50 },
-    { id: 'fox',     name: 'روباه',   emoji: '🦊', price: 80 },
-    { id: 'panda',   name: 'پاندا',   emoji: '🐼', price: 120 },
-    { id: 'tiger',   name: 'ببر',     emoji: '🐯', price: 160 },
-    { id: 'unicorn', name: 'اسب تک‌شاخ', emoji: '🦄', price: 250 },
+    { id: 'cat',     name: 'گربه',    emoji: '🐱', price: 0,   rarity: 'common',    desc: 'قهرمان اصلی؛ چابک و قابل اعتماد.',        perkText: 'بدون ویژگی ویژه — متعادل',            perk: {},                 meters: [3, 3, 3, 3, 3, 3] },
+    { id: 'dog',     name: 'سگ',      emoji: '🐶', price: 30,  rarity: 'common',    desc: 'با بوی سکه‌ها را از دور پیدا می‌کند.',     perkText: 'شعاع جمع‌کردن سکه +۱۰',               perk: { coinRange: 10 },  meters: [3, 5, 3, 3, 3, 3] },
+    { id: 'rabbit',  name: 'خرگوش',   emoji: '🐰', price: 50,  rarity: 'rare',      desc: 'جهش‌های بلند و سبک.',                      perkText: 'پرش بلندتر (+۶٪)',                    perk: { jump: 1.06 },     meters: [5, 3, 3, 3, 3, 3] },
+    { id: 'fox',     name: 'روباه',   emoji: '🦊', price: 80,  rarity: 'rare',      desc: 'زرنگ است و قدرت‌ها را زودتر پیدا می‌کند.', perkText: 'شانس ظاهر شدن قدرت‌ها +۳۰٪',          perk: { luck: 1.3 },      meters: [3, 3, 5, 3, 3, 3] },
+    { id: 'panda',   name: 'پاندا',   emoji: '🐼', price: 120, rarity: 'epic',      desc: 'سخت‌جان و آرام.',                          perkText: 'مصونیت ۲ ثانیه‌ای پس از شکستن سپر',    perk: { hitInv: 2.0 },    meters: [3, 3, 3, 5, 3, 3] },
+    { id: 'tiger',   name: 'ببر',     emoji: '🐯', price: 160, rarity: 'epic',      desc: 'سریع و پرانرژی؛ امتیاز بیشتر می‌گیرد.',    perkText: 'امتیاز +۸٪',                          perk: { score: 1.08 },    meters: [3, 3, 3, 3, 5, 3] },
+    { id: 'unicorn', name: 'اسب تک‌شاخ', emoji: '🦄', price: 250, rarity: 'legendary', desc: 'جادویی؛ قدرت‌ها در دستانش بیشتر می‌ماند.',  perkText: 'مدت قدرت‌ها +۲۵٪',                    perk: { dur: 1.25 },      meters: [3, 3, 3, 3, 3, 5] },
   ];
+  // base/accel/max: سرعت. gapMul/minGap: فاصلهٔ زمانی موانع (ثانیه). enemyMul: احتمال دشمن. phaseScale: زودتر/دیرتر رسیدن مراحل.
+  // comboMul: ترکیب‌های فشرده. warnMul: مدت هشدار پیش از حملهٔ دشمن.
   const DIFFS = {
-    easy:   { base: 300, accel: 5, max: 700 },
-    normal: { base: 380, accel: 7, max: 850 },
-    hard:   { base: 460, accel: 9, max: 1000 },
+    easy:   { base: 300, accel: 5, max: 700,  gapMul: 1.2, minGap: 1.0,  enemyMul: 0.6, phaseScale: 1.35, comboMul: 0,   warnMul: 1.3 },
+    normal: { base: 380, accel: 7, max: 850,  gapMul: 1.0, minGap: 0.88, enemyMul: 1.0, phaseScale: 1.0,  comboMul: 1,   warnMul: 1.0 },
+    hard:   { base: 460, accel: 9, max: 1000, gapMul: 0.9, minGap: 0.8,  enemyMul: 1.3, phaseScale: 0.7,  comboMul: 1.5, warnMul: 0.8 },
   };
 
-  // مأموریت‌ها: stat = کلید آمار تجمعی (یا best = بهترین امتیاز)
+  // دشمن‌ها: vx = سرعت اضافه نسبت به زمین (بعد از هشدار). lane: ground = باید پرید، air = باید خم شد (یا پرید)
+  const ENEMIES = {
+    hedgehog: { icon: '🦔', size: 34, w: 34, h: 26, vx: 90,  warn: 0.55, lane: 'ground', name: 'خارپشت' },
+    bat:      { icon: '🦇', size: 36, w: 36, h: 24, vx: 30,  warn: 0.65, lane: 'air',    name: 'خفاش' },
+    boar:     { icon: '🐗', size: 44, w: 46, h: 34, vx: 300, warn: 0.95, lane: 'ground', name: 'گراز' },
+    ghost:    { icon: '👻', size: 38, w: 34, h: 34, vx: 20,  warn: 0.7,  lane: 'air',    name: 'روح' },
+  };
+  // مراحل (بر اساس امتیاز). intro = دشمنی که اولین بار در همین مرحله معرفی می‌شود.
+  const PHASES = [
+    { name: 'دشت آرام',    icon: '🌿', from: 0,    enemy: 0,    combo: 0,    gap: [1.05, 1.8],  pool: [],                                    intro: null },
+    { name: 'جادهٔ پرخطر', icon: '🦔', from: 250,  enemy: 0.22, combo: 0.12, gap: [1.0, 1.7],   pool: ['hedgehog'],                          intro: 'hedgehog' },
+    { name: 'آسمان شلوغ',  icon: '🦇', from: 600,  enemy: 0.32, combo: 0.2,  gap: [0.95, 1.55], pool: ['hedgehog', 'bat'],                   intro: 'bat' },
+    { name: 'شب وحشت',     icon: '🐗', from: 1000, enemy: 0.42, combo: 0.28, gap: [0.92, 1.45], pool: ['hedgehog', 'bat', 'boar'],           intro: 'boar' },
+    { name: 'طوفان',       icon: '👻', from: 1500, enemy: 0.5,  combo: 0.35, gap: [0.9, 1.35],  pool: ['hedgehog', 'bat', 'boar', 'ghost'],  intro: 'ghost' },
+  ];
+
+  // مأموریت‌ها: stat = کلید آمار تجمعی (یا best = بهترین امتیاز، bestPhase = بهترین مرحله)
   const MISSIONS = [
     { id: 'coins50',   icon: '🪙', title: 'جمع‌آوری ۵۰ سکه',               stat: 'coins',       target: 50,   reward: 15 },
     { id: 'coins300',  icon: '💰', title: 'جمع‌آوری ۳۰۰ سکه',              stat: 'coins',       target: 300,  reward: 60 },
@@ -56,6 +79,9 @@
     { id: 'smash10',   icon: '🚀', title: 'له کردن ۱۰ مانع با سرعت‌دهنده',  stat: 'smashed',     target: 10,   reward: 40 },
     { id: 'runs10',    icon: '🎮', title: 'انجام ۱۰ بازی',                  stat: 'runs',        target: 10,   reward: 20 },
     { id: 'revive1',   icon: '💖', title: 'استفاده از نجات یک‌باره',         stat: 'revives',     target: 1,    reward: 20 },
+    { id: 'phase3',    icon: '🦇', title: 'رسیدن به مرحلهٔ ۳',               stat: 'bestPhase',   target: 3,    reward: 40 },
+    { id: 'phase5',    icon: '⚡', title: 'رسیدن به مرحلهٔ ۵',               stat: 'bestPhase',   target: 5,    reward: 120 },
+    { id: 'enemy25',   icon: '🐗', title: 'عبور از ۲۵ دشمن',                 stat: 'enemies',     target: 25,   reward: 40 },
   ];
 
   // دستاوردها: به‌صورت خودکار باز می‌شوند (بدون جایزهٔ سکه)
@@ -69,12 +95,14 @@
     { id: 'hard800',   icon: '🔥', title: 'بی‌باک',        desc: 'در سطح سخت به ۸۰۰ برس',           test: () => g.d === DIFFS.hard && g.score >= 800 },
     { id: 'marathon',  icon: '🏅', title: 'ماراتن',        desc: 'به امتیاز ۱۵۰۰ برس',              test: () => Math.max(save.best, g.score) >= 1500 },
     { id: 'collector', icon: '🐱', title: 'کلکسیونر',      desc: 'همهٔ شخصیت‌ها را بخر',            test: () => save.owned.length >= CHARACTERS.length },
+    { id: 'hunter',    icon: '🦔', title: 'شکارچی',        desc: '۱۰ دشمن را در یک بازی رد کن',     test: () => g.run.enemies >= 10 },
+    { id: 'storm',     icon: '⚡', title: 'طوفان‌دیده',     desc: 'به مرحلهٔ ۵ برس',               test: () => save.stats.bestPhase >= 5 || g.phase >= 4 },
   ];
 
   /* ---------- ذخیره‌سازی ---------- */
   // کلید ذخیره همان نسخهٔ ۱ است؛ فیلدهای قدیمی حفظ و فیلدهای جدید با مقدار پیش‌فرض اضافه می‌شوند.
   const SAVE_KEY = 'catRunnerSave';
-  const STAT_KEYS = ['coins', 'passed', 'powers', 'doubleJumps', 'smashed', 'revives', 'nights', 'runs'];
+  const STAT_KEYS = ['coins', 'passed', 'powers', 'doubleJumps', 'smashed', 'revives', 'nights', 'runs', 'enemies', 'bestPhase'];
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const clampInt = (v, def, max = 1e9) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : def);
   const clamp01 = (v, def) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : def);
@@ -84,7 +112,7 @@
     const stats = {};
     STAT_KEYS.forEach(k => { stats[k] = 0; });
     return {
-      ver: 2, coins: 0, best: 0, owned: ['cat'], selected: 'cat', difficulty: 'normal', scores: [],
+      ver: 3, coins: 0, best: 0, owned: ['cat'], selected: 'cat', difficulty: 'normal', scores: [],
       muted: false, music: true, sfx: true, musicVol: 0.6, sfxVol: 0.8, vibrate: true,
       stats, claimed: {}, achievements: {},
     };
@@ -122,15 +150,16 @@
   function loadSave() {
     let text = null, raw = null;
     try { text = localStorage.getItem(SAVE_KEY); raw = JSON.parse(text || '{}'); } catch (e) { raw = null; }
-    // پیش از اولین ذخیرهٔ نسخهٔ ۲، یک نسخهٔ پشتیبان از ذخیرهٔ قدیمی نگه می‌داریم.
+    // پیش از اولین ذخیرهٔ نسخهٔ ۳، از ذخیرهٔ قبلی (۱ یا ۲) یک نسخهٔ پشتیبان نگه می‌داریم.
     try {
-      if (text && raw && raw.ver !== 2 && !localStorage.getItem(SAVE_KEY + '_v1_backup')) {
-        localStorage.setItem(SAVE_KEY + '_v1_backup', text);
+      if (text && raw && raw.ver !== 3) {
+        const key = SAVE_KEY + (raw.ver === 2 ? '_v2_backup' : '_v1_backup');
+        if (!localStorage.getItem(key)) localStorage.setItem(key, text);
       }
     } catch (e) {}
     return normalizeSave(raw);
   }
-  function persist() { try { save.ver = 2; localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+  function persist() { try { save.ver = 3; localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
   const save = loadSave();
 
   function replaceSave(clean) {
@@ -146,7 +175,7 @@
   }
   function serializeSave() {
     const data = JSON.parse(JSON.stringify(save));
-    return JSON.stringify({ app: 'cat-runner', version: 2, exported: new Date().toISOString(), sum: checksum(JSON.stringify(data)), data }, null, 2);
+    return JSON.stringify({ app: 'cat-runner', version: 3, gameVersion: VERSION, exported: new Date().toISOString(), sum: checksum(JSON.stringify(data)), data }, null, 2);
   }
   const MAX_IMPORT_BYTES = 200000;
   function parseImport(text) {
@@ -154,7 +183,7 @@
     let obj;
     try { obj = JSON.parse(text); } catch (e) { return { error: 'فایل JSON معتبر نیست.' }; }
     if (!obj || typeof obj !== 'object' || obj.app !== 'cat-runner') return { error: 'این فایل مربوط به Cat Runner نیست.' };
-    if (!Number.isInteger(obj.version) || obj.version < 1 || obj.version > 2) return { error: 'نسخهٔ فایل پشتیبانی نمی‌شود.' };
+    if (!Number.isInteger(obj.version) || obj.version < 1 || obj.version > 3) return { error: 'نسخهٔ فایل پشتیبانی نمی‌شود.' };
     const d = obj.data;
     if (!d || typeof d !== 'object' || Array.isArray(d)) return { error: 'داده‌های ذخیره در فایل پیدا نشد.' };
     if (obj.sum !== undefined && obj.sum !== checksum(JSON.stringify(d))) return { error: 'فایل خراب یا ویرایش‌شده است.' };
@@ -200,6 +229,9 @@
     buy:   () => { beep(600, 0.1, 'triangle', 0.08); setTimeout(() => beep(900, 0.15, 'triangle', 0.08), 90); },
     error: () => beep(150, 0.2, 'square', 0.06),
     boost: () => { beep(300, 0.35, 'sawtooth', 0.07, 900); },
+    warn:  () => { beep(220, 0.12, 'square', 0.05); setTimeout(() => beep(220, 0.12, 'square', 0.05), 150); },
+    phase: () => { [392, 523, 659].forEach((f, i) => setTimeout(() => beep(f, 0.16, 'triangle', 0.08), i * 110)); },
+    tick:  () => beep(740, 0.04, 'triangle', 0.05),
     smash: () => beep(180, 0.12, 'sawtooth', 0.08, -90),
     revive:() => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.14, 'triangle', 0.08), i * 80)); },
     mission:() => { beep(784, 0.1, 'triangle', 0.07); setTimeout(() => beep(1175, 0.18, 'triangle', 0.07), 110); },
@@ -229,16 +261,20 @@
   const stars = Array.from({ length: 40 }, () => ({ x: rand(0, W), y: rand(0, GY - 60), r: rand(0.6, 1.8) }));
   const clouds = Array.from({ length: 5 }, (_, i) => ({ x: i * 180 + rand(0, 80), y: rand(25, 120), s: rand(0.7, 1.4) }));
 
+  const currentChar = () => CHARACTERS.find(c => c.id === save.selected) || CHARACTERS[0];
+
   function newGame() {
     const d = DIFFS[save.difficulty];
+    const perk = currentChar().perk || {};
     g = {
-      d, t: 0, score: 0, coins: 0, speed: d.base,
+      d, perk, durMul: perk.dur || 1, t: 0, score: 0, coins: 0, speed: d.base,
       obstacles: [], items: [], particles: [],
       spawnIn: 700, shake: 0, flash: 0,
       shield: false, inv: 0, magnet: 0, x2: 0, boost: 0, boostMul: 1, revive: false,
+      phase: 0, intro: null, tight: 0, lastLane: 'air',
       milestone: 0, bgx: 0, groundX: 0, checkIn: 0.5,
       started: false, committed: false, result: null,
-      run: { coins: 0, passed: 0, powers: 0, doubleJumps: 0, smashed: 0, revives: 0, nights: 0, types: new Set() },
+      run: { coins: 0, passed: 0, powers: 0, doubleJumps: 0, smashed: 0, revives: 0, nights: 0, enemies: 0, types: new Set() },
       player: { x: 100, y: GY, vy: 0, jumps: 0, grounded: true, ducking: false, run: 0 },
     };
   }
@@ -259,7 +295,7 @@
     if (state !== 'playing') return;
     const p = g.player;
     if (p.jumps >= 2) return;
-    p.vy = p.jumps === 0 ? -JUMP : -JUMP * 0.9;
+    p.vy = (p.jumps === 0 ? -JUMP : -JUMP * 0.9) * (g.perk.jump || 1);
     (p.jumps === 0 ? sfx.jump : sfx.jump2)();
     if (p.jumps === 0) dust(p.x + 20, GY);
     if (p.jumps === 1) g.run.doubleJumps++;
@@ -275,34 +311,127 @@
     return pool[0][0];
   }
 
-  function spawn() {
-    const x = W + 40;
-    const birdChance = g.score > 150 ? 0.25 : g.score > 60 ? 0.12 : 0;
-    const r = Math.random();
-    let o;
-    if (r < birdChance) {
-      o = { type: 'bird', x, w: 40, h: 28, y: Math.random() < 0.5 ? GY - 58 : GY - 36 };
-    } else if (r < birdChance + (1 - birdChance) * 0.6) {
+  /* ---------- مراحل و دشمن‌ها ---------- */
+  function phaseFor(score, d) {
+    let idx = 0;
+    for (let i = 1; i < PHASES.length; i++) if (score >= PHASES[i].from * d.phaseScale) idx = i;
+    return idx;
+  }
+  function countEnemies() {
+    let n = 0;
+    for (const o of g.obstacles) if (o.enemy && !o.dead) n++;
+    return n;
+  }
+
+  // زمان رسیدن مرکز خطر به بازیکن (شامل مدت هشدار و سرعت نهایی دشمن)
+  function arrivalTime(o, sp) {
+    return (o.warn || 0) + Math.max(0, o.x + o.w / 2 - g.player.x) / (sp + (o.vxf || 0));
+  }
+  // قانون انصاف: فاصلهٔ زمانی رسیدن هر دو خطر باید حداقل minGap باشد تا همیشه زمان واکنش/فرود هست.
+  function arrivalGapOk(u, sp) {
+    const tu = arrivalTime(u, sp);
+    for (const o of g.obstacles) {
+      if (o.dead || o.x + o.w < g.player.x) continue;
+      if (Math.abs(arrivalTime(o, sp) - tu) < g.d.minGap) return false;
+    }
+    return true;
+  }
+
+  function makeGround(x) {
+    if (Math.random() < 0.6) {
       const h = rand(38, 64), single = rand(22, 32);
       const dbl = g.score > 40 && Math.random() < 0.3;
-      o = { type: 'cactus', x, w: dbl ? single * 2 + 6 : single, h, y: GY - h, dbl, single };
-    } else {
-      o = { type: 'rock', x, w: 40, h: 28, y: GY - 28 };
+      return { type: 'cactus', lane: 'ground', x, w: dbl ? single * 2 + 6 : single, h, y: GY - h, dbl, single };
+    }
+    return { type: 'rock', lane: 'ground', x, w: 40, h: 28, y: GY - 28 };
+  }
+  function makeBird(x, high) {
+    return { type: 'bird', lane: high ? 'air' : 'ground', x, w: 40, h: 28, y: high ? GY - 58 : GY - 36 };
+  }
+  function makeEnemy(kind, intro) {
+    const def = ENEMIES[kind];
+    const warn = def.warn * g.d.warnMul * (intro ? 1.4 : 1);
+    const o = { type: kind, kind, enemy: true, intro: !!intro, lane: def.lane, x: W + 60, w: def.w, h: def.h, y: GY - def.h,
+      vx: 0, vxf: def.vx, warn, maxWarn: warn, t: 0, noHit: false };
+    if (kind === 'bat') {
+      o.cy = GY - rand(60, 90); o.amp = 20; o.freq = rand(2.6, 3.4); o.phase = rand(0, 6.28);
+      o.y = o.cy - o.h / 2;
+    } else if (kind === 'ghost') {
+      o.y = GY - 61; // مرکز ≈ GY-44: ایستاده گیر می‌کند، خم‌شده رد می‌شود
+    }
+    return o;
+  }
+
+  // انتخاب واحد بعدی: معرفی دشمن جدید › ترکیب فشرده (تغییر زمینی/هوایی) › دشمن › مانع معمولی
+  function pickUnit(x) {
+    const ph = PHASES[g.phase], d = g.d;
+    if (g.intro && countEnemies() < 2) { const k = g.intro; g.intro = null; return makeEnemy(k, true); }
+    const want = g.tight > 0 ? (g.lastLane === 'ground' ? 'air' : 'ground') : null;
+    if (ph.pool.length && countEnemies() < 2) {
+      const start = ph.from * d.phaseScale;
+      const next = PHASES[g.phase + 1] ? PHASES[g.phase + 1].from * d.phaseScale : start + 800;
+      const ramp = 0.7 + 0.3 * Math.min(1, Math.max(0, (g.score - start) / (next - start)));
+      if (Math.random() < ph.enemy * d.enemyMul * ramp) {
+        const kinds = ph.pool.filter(k => !want || ENEMIES[k].lane === want);
+        if (kinds.length) return makeEnemy(kinds[(Math.random() * kinds.length) | 0], false);
+      }
+    }
+    if (want === 'air') return makeBird(x, true);
+    if (want === 'ground') return makeGround(x);
+    const birdChance = g.score > 150 ? 0.25 : g.score > 60 ? 0.12 : 0;
+    if (Math.random() < birdChance) return makeBird(x, Math.random() < 0.5);
+    return makeGround(x);
+  }
+
+  function spawn() {
+    const x = W + 40;
+    const sp = g.speed * g.boostMul;
+    const ph = PHASES[g.phase], d = g.d;
+    if (g.obstacles.length >= 8) { g.spawnIn = sp * 0.2; return; }
+    const o = pickUnit(x);
+    if (!arrivalGapOk(o, sp)) { // ترکیب ناعادلانه: کمی صبر می‌کنیم
+      if (o.intro) g.intro = o.kind;
+      g.spawnIn = sp * 0.05;
+      return;
     }
     g.obstacles.push(o);
+    g.lastLane = o.lane;
+    if (o.enemy) sfx.warn();
+    if (g.tight > 0) g.tight--;
+    else if (Math.random() < ph.combo * d.comboMul) g.tight = Math.random() < 0.35 ? 2 : 1;
 
-    // سکه‌ها به صورت قوس بالای مانع
-    if (Math.random() < 0.65) {
+    // سکه‌ها به صورت قوس بالای مانع ثابت
+    if (!o.enemy && Math.random() < 0.65) {
       for (let i = 0; i < 5; i++) {
         g.items.push({ type: 'coin', x: x + o.w / 2 - 80 + i * 40, y: GY - 45 - Math.sin((i / 4) * Math.PI) * 75, r: 11 });
       }
     }
     // پاورآپ
-    if (Math.random() < 0.12) {
-      g.items.push({ type: pickPower(), x: x + o.w + 90, y: GY - 80, r: 16 });
+    if (Math.random() < 0.12 * (g.perk.luck || 1)) {
+      g.items.push({ type: pickPower(), x: x + (o.w || 40) + 90, y: GY - 80, r: 16 });
     }
-    g.spawnIn = g.speed * rand(0.95, 1.7);
+    const gapT = g.tight > 0 ? d.minGap + 0.06 : Math.max(d.minGap + 0.04, rand(ph.gap[0], ph.gap[1]) * d.gapMul);
+    g.spawnIn = sp * gapT;
   }
+
+  function updateEnemy(o, dt, sp) {
+    o.t += dt;
+    if (o.warn > 0) { // هشدار: ثابت در لبهٔ بیرون صفحه، بدون برخورد
+      o.warn -= dt;
+      if (o.warn <= 0) { o.warn = 0; o.vx = o.vxf; }
+      return;
+    }
+    o.x -= (sp + o.vx) * dt;
+    if (o.kind === 'bat') {
+      o.y = o.cy + Math.sin(o.t * o.freq + o.phase) * o.amp - o.h / 2;
+    } else if (o.kind === 'ghost') {
+      const c = (o.t % 1.6) / 1.6;
+      o.noHit = c >= 0.55 && c < 0.95; // فاز کم‌رنگ = قابل عبور
+    } else if (o.kind === 'boar' && g.particles.length < 400 && Math.random() < 0.6) {
+      g.particles.push({ x: o.x + o.w, y: GY - 2, vx: rand(40, 120), vy: rand(-50, -10), life: 0.3, max: 0.3, color: '#d7c9a7', size: rand(2, 4) });
+    }
+  }
+  const hittable = o => !o.dead && !(o.warn > 0) && !o.noHit;
 
   /* ---------- برخورد ---------- */
   function playerBox() {
@@ -321,6 +450,7 @@
     save.coins = Math.min(1e9, save.coins + g.coins);
     STAT_KEYS.forEach(k => { save.stats[k] = Math.min(1e9, save.stats[k] + (g.run[k] || 0)); });
     save.stats.runs = Math.min(1e9, save.stats.runs + 1);
+    save.stats.bestPhase = Math.max(save.stats.bestPhase, g.phase + 1);
     if (score > 0) {
       save.scores.push(score);
       save.scores.sort((a, b) => b - a);
@@ -341,6 +471,7 @@
     const res = commitRun();
     checkProgress();
     $('hud').hidden = true;
+    hideBanner();
     setTimeout(() => {
       if (state !== 'over') return;
       fillGameOver(res);
@@ -354,6 +485,7 @@
   function smash(o) {
     o.dead = true; o.counted = true;
     g.run.passed++; g.run.smashed++;
+    if (o.enemy) g.run.enemies++;
     g.score += 5;
     burst(o.x + o.w / 2, o.y + o.h / 2, '#ff9800', 14, 280);
     sfx.smash(); vibrate(10);
@@ -378,9 +510,9 @@
     burst(it.x, it.y, POWER_COLORS[it.type] || '#fff', 12);
     switch (it.type) {
       case 'shield': g.shield = true; break;
-      case 'magnet': g.magnet = POWER_DUR.magnet; break;
-      case 'x2':     g.x2 = POWER_DUR.x2; break;
-      case 'boost':  g.boost = POWER_DUR.boost; g.flash = 0.5; g.shake = 0.25; sfx.boost(); vibrate([20, 20, 40]); break;
+      case 'magnet': g.magnet = POWER_DUR.magnet * g.durMul; break;
+      case 'x2':     g.x2 = POWER_DUR.x2 * g.durMul; break;
+      case 'boost':  g.boost = POWER_DUR.boost * g.durMul; g.flash = 0.5; g.shake = 0.25; sfx.boost(); vibrate([20, 20, 40]); break;
       case 'revive': g.revive = true; sfx.revive(); break;
     }
   }
@@ -389,6 +521,7 @@
   function statValue(m) {
     const live = g && g.started && !g.committed;
     if (m.stat === 'best') return Math.max(save.best, live ? Math.floor(g.score) : 0);
+    if (m.stat === 'bestPhase') return Math.max(save.stats.bestPhase, live ? g.phase + 1 : 0);
     return save.stats[m.stat] + (live ? (g.run[m.stat] || 0) : 0);
   }
   const claimableCount = () => MISSIONS.filter(m => !save.claimed[m.id] && statValue(m) >= m.target).length;
@@ -428,6 +561,26 @@
 
   /* ---------- به‌روزرسانی ---------- */
 
+  let bannerTimer = 0;
+  function hideBanner() {
+    const el = $('phaseBanner');
+    if (el) { el.hidden = true; el.classList.remove('show'); }
+    clearTimeout(bannerTimer);
+  }
+  function showBanner(idx) {
+    const el = $('phaseBanner'), ph = PHASES[idx];
+    if (!el || !ph) return;
+    el.textContent = `${ph.icon} مرحلهٔ ${fa(idx + 1)} — ${ph.name}`;
+    el.hidden = false; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(hideBanner, 2400);
+  }
+  function onPhase(idx) {
+    const ph = PHASES[idx];
+    if (ph.intro) g.intro = ph.intro;
+    showBanner(idx); sfx.phase(); vibrate(30);
+  }
+
   function updateParticles(dt) {
     for (const q of g.particles) {
       q.life -= dt; q.vy += 600 * dt; q.x += q.vx * dt; q.y += q.vy * dt;
@@ -439,7 +592,7 @@
 
   function update(dt) {
     g.t += dt;
-    g.speed = Math.min(g.d.max, g.speed + g.d.accel * dt);
+    g.speed = Math.min(g.d.max, g.speed + g.d.accel * (1 + 0.1 * g.phase) * dt);
     if (g.boost > 0) {
       g.boost -= dt;
       if (g.boost <= 0) { g.boost = 0; g.inv = Math.max(g.inv, 1.2); }
@@ -447,7 +600,10 @@
     g.boostMul += ((g.boost > 0 ? BOOST_MUL : 1) - g.boostMul) * Math.min(1, dt * 6);
     if (g.boost <= 0 && g.boostMul < 1.01) g.boostMul = 1;
     const sp = g.speed * g.boostMul; // سرعت مؤثر (با احتساب سرعت‌دهنده)
-    g.score += ((sp * dt) / 18) * (g.x2 > 0 ? 2 : 1);
+    g.score += ((sp * dt) / 18) * (g.x2 > 0 ? 2 : 1) * (g.perk.score || 1);
+    const phNow = phaseFor(g.score, g.d);
+    if (phNow > g.phase) { g.phase = phNow; onPhase(phNow); }
+    if (g.phase >= 4 && Math.random() < dt * 0.12) g.flash = Math.max(g.flash, 0.25); // رعد و برق مرحلهٔ طوفان
     g.bgx += sp * 0.15 * dt;
     g.groundX = (g.groundX + sp * dt) % 40;
     if (g.inv > 0) g.inv -= dt;
@@ -487,8 +643,8 @@
 
     // حرکت
     for (const o of g.obstacles) {
-      o.x -= sp * dt;
-      if (!o.counted && o.x + o.w < g.player.x) { o.counted = true; g.run.passed++; }
+      if (o.enemy) updateEnemy(o, dt, sp); else o.x -= sp * dt;
+      if (!o.counted && o.x + o.w < g.player.x) { o.counted = true; g.run.passed++; if (o.enemy) g.run.enemies++; }
     }
     g.obstacles = g.obstacles.filter(o => !o.dead && o.x + o.w > -60);
 
@@ -500,7 +656,7 @@
         const dx = pcx - it.x, dy = pcy - it.y, dist = Math.hypot(dx, dy);
         if (dist < 240 && dist > 1) { it.x += (dx / dist) * 600 * dt; it.y += (dy / dist) * 600 * dt; }
       }
-      if (!it.done && Math.hypot(pcx - it.x, pcy - it.y) < it.r + 22) {
+      if (!it.done && Math.hypot(pcx - it.x, pcy - it.y) < it.r + 22 + (it.type === 'coin' ? (g.perk.coinRange || 0) : 0)) {
         it.done = true;
         if (it.type === 'coin') { g.coins++; g.run.coins++; sfx.coin(); burst(it.x, it.y, '#ffd600', 5, 120); }
         else collectPower(it);
@@ -511,13 +667,13 @@
     // برخورد با مانع
     if (g.boost > 0) {
       // حین سرعت‌دهنده شکست‌ناپذیر است و مانع‌ها را خرد می‌کند
-      for (const o of g.obstacles) if (!o.dead && overlap(pb, obBox(o))) smash(o);
+      for (const o of g.obstacles) if (hittable(o) && overlap(pb, obBox(o))) smash(o);
     } else if (g.inv <= 0) {
       for (const o of g.obstacles) {
-        const ob = { l: o.x + 5, r: o.x + o.w - 5, t: o.y + 5, b: o.y + o.h - 3 };
-        if (overlap(pb, ob)) {
+        if (!hittable(o)) continue;
+        if (overlap(pb, obBox(o))) {
           if (g.shield) {
-            g.shield = false; g.inv = 1.2; sfx.shield();
+            g.shield = false; g.inv = g.perk.hitInv || 1.2; sfx.shield();
             burst(o.x + o.w / 2, o.y + o.h / 2, '#40c4ff', 16, 250);
             g.obstacles = g.obstacles.filter(x => x !== o);
             g.shake = 0.2;
@@ -546,11 +702,15 @@
     setNum('hudScore', g.score);
     setNum('hudBest', Math.max(save.best, g.score));
     setNum('hudCoins', g.coins);
+    if (hudCache.ph !== g.phase) {
+      hudCache.ph = g.phase;
+      $('hudPhase').textContent = `${PHASES[g.phase].icon} مرحله ${fa(g.phase + 1)}`;
+    }
     const x2on = g.x2 > 0;
     if (hudCache.x2on !== x2on) { hudCache.x2on = x2on; $('hudScoreChip').classList.toggle('x2', x2on); }
     const fr = {
       shield: g.shield ? 1 : 0, revive: g.revive ? 1 : 0,
-      magnet: g.magnet / POWER_DUR.magnet, x2: g.x2 / POWER_DUR.x2, boost: g.boost / POWER_DUR.boost,
+      magnet: g.magnet / (POWER_DUR.magnet * g.durMul), x2: g.x2 / (POWER_DUR.x2 * g.durMul), boost: g.boost / (POWER_DUR.boost * g.durMul),
     };
     for (const k in powerChips) {
       const c = powerChips[k], f = Math.max(0, Math.min(1, fr[k]));
@@ -559,7 +719,7 @@
       if (!on) continue;
       c.bar.style.transform = `scaleX(${f.toFixed(2)})`;
       if (c.time) {
-        const sec = Math.ceil(f * POWER_DUR[k]);
+        const sec = Math.ceil(f * POWER_DUR[k] * g.durMul);
         if (hudCache['t' + k] !== sec) { hudCache['t' + k] = sec; c.time.textContent = fa(sec); }
       }
     }
@@ -622,6 +782,72 @@
     for (let x = -g.groundX; x < W; x += 40) ctx.fillRect(x, GY + 22, 18, 3);
   }
 
+  function ghostAlpha(c) {
+    if (c < 0.55) return 1;
+    if (c < 0.65) return 1 - 0.7 * ((c - 0.55) / 0.1);
+    if (c < 0.85) return 0.3;
+    if (c < 0.95) return 0.3 + 0.7 * ((c - 0.85) / 0.1);
+    return 1;
+  }
+
+  // نشانهٔ هشدار در لبهٔ راست: نوع دشمن + مثلث ! + (برای گراز) خط قرمز روی زمین
+  function drawWarn(o, def) {
+    const k = 1 - o.warn / o.maxWarn;
+    const blink = Math.floor(g.t * 9) % 2 === 0;
+    const x = W - 34, y = o.lane === 'air' ? (o.cy || GY - 60) : GY - 34;
+    ctx.save();
+    if (o.kind === 'boar') {
+      ctx.fillStyle = `rgba(229,57,53,${blink ? 0.5 : 0.2})`;
+      ctx.fillRect(W - 220 * (0.4 + k * 0.6), GY - 8, 220, 6);
+    }
+    ctx.globalAlpha = blink ? 1 : 0.55;
+    ctx.fillStyle = '#e53935';
+    ctx.beginPath();
+    ctx.moveTo(x - 20, y); ctx.lineTo(x + 14, y - 20 - k * 4); ctx.lineTo(x + 14, y + 20 + k * 4); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px Tahoma, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('!', x + 3, y + 1);
+    ctx.font = `18px ${EMOJI_FONT}`;
+    ctx.fillText(def.icon, x - 12, y - 28);
+    ctx.restore();
+  }
+
+  function drawEnemy(o) {
+    const def = ENEMIES[o.kind];
+    if (o.warn > 0) { drawWarn(o, def); return; }
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+    if (o.lane === 'ground') {
+      ctx.fillStyle = 'rgba(0,0,0,.2)';
+      ctx.beginPath(); ctx.ellipse(cx, GY + 3, o.w * 0.5, 4, 0, 0, 7); ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(cx, cy + (o.kind === 'ghost' ? Math.sin(o.t * 4) * 4 : 0));
+    let sx = 1, sy = 1;
+    if (o.kind === 'hedgehog') sy = 1 + Math.sin(o.t * 12) * 0.06;
+    else if (o.kind === 'bat') sx = 1 + Math.sin(o.t * 18) * 0.25;
+    else if (o.kind === 'boar') ctx.translate(0, Math.sin(o.t * 40) * 1.5);
+    else if (o.kind === 'ghost') ctx.globalAlpha = ghostAlpha((o.t % 1.6) / 1.6);
+    ctx.scale(sx, sy);
+    ctx.font = `${def.size}px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(def.icon, 0, 0);
+    ctx.restore();
+  }
+
+  // حاشیهٔ قرمز خطر از مرحلهٔ ۴ (گرادیان برای هر مرحله فقط یک بار ساخته می‌شود)
+  const dangerGrads = {};
+  function drawDangerFx() {
+    if (g.phase < 3) return;
+    let gr = dangerGrads[g.phase];
+    if (!gr) {
+      gr = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.65);
+      gr.addColorStop(0, 'rgba(200,0,0,0)');
+      gr.addColorStop(1, `rgba(200,0,0,${0.12 + 0.06 * (g.phase - 3)})`);
+      dangerGrads[g.phase] = gr;
+    }
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+  }
+
   function drawObstacle(o) {
     if (o.type === 'cactus') {
       ctx.font = `${o.h * 1.05}px ${EMOJI_FONT}`;
@@ -637,6 +863,8 @@
       ctx.lineTo(o.x + 32, o.y + 6); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.closePath(); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,.25)';
       ctx.beginPath(); ctx.moveTo(o.x + 10, o.y + 10); ctx.lineTo(o.x + 18, o.y + 3); ctx.lineTo(o.x + 24, o.y + 10); ctx.fill();
+    } else if (o.enemy) {
+      drawEnemy(o);
     } else {
       ctx.save();
       ctx.translate(o.x + o.w / 2, o.y + o.h / 2);
@@ -729,6 +957,7 @@
     if (g.shake > 0) ctx.translate(rand(-1, 1) * g.shake * 14, rand(-1, 1) * g.shake * 14);
     drawBackground(n);
     drawBoostFx();
+    drawDangerFx();
     g.items.forEach(drawItem);
     g.obstacles.forEach(o => { if (!o.dead) drawObstacle(o); });
     drawPlayer();
@@ -771,30 +1000,103 @@
     document.querySelectorAll('[data-action="mute"]').forEach(b => { b.textContent = save.muted ? '🔇' : '🔊'; });
     const ch = CHARACTERS.find(c => c.id === save.selected) || CHARACTERS[0];
     $('menuHero').textContent = ch.emoji;
+    document.querySelectorAll('[data-bind="version"]').forEach(e => { e.textContent = VERSION_FA; });
   }
+  /* ---------- فروشگاه آرکید ---------- */
+  let shopIndex = 0;
+  const shopChar = () => CHARACTERS[shopIndex] || CHARACTERS[0];
+
+  function countTo(el, from, to, ms) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || from === to) { el.textContent = fa(to); return; }
+    const t0 = performance.now();
+    const step = now => {
+      const k = Math.min(1, (now - t0) / ms);
+      el.textContent = fa(from + (to - from) * k);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   function renderShop() {
-    const cur = CHARACTERS.find(c => c.id === save.selected);
+    const c = shopChar();
+    const owned = save.owned.includes(c.id), selected = save.selected === c.id;
+    const st = $('shopStage');
     $('shopCoins').textContent = fa(save.coins);
-    $('selectedCharacterName').textContent = cur.name;
-    $('selectedCharacterPreview').textContent = cur.emoji;
-    const box = $('shopCharacters');
-    box.innerHTML = '';
-    CHARACTERS.forEach(c => {
-      const owned = save.owned.includes(c.id);
+    $('shopPreview').textContent = c.emoji;
+    st.classList.toggle('owned', owned);
+    st.classList.toggle('selected', selected);
+    st.classList.toggle('locked', !owned);
+    $('shopLock').hidden = owned;
+    $('shopName').textContent = c.name;
+    const rb = $('shopRarity');
+    rb.textContent = RARITY[c.rarity];
+    rb.className = 'rarity ' + c.rarity;
+    $('shopDesc').textContent = c.desc;
+    $('shopPerk').textContent = '⭐ ' + c.perkText;
+    $('shopMeters').innerHTML = METER_LABELS.map((l, i) => `<div class="meter"><span>${l}</span><i style="--v:${c.meters[i]}"></i></div>`).join('');
+    $('shopPrice').textContent = owned ? (selected ? '✔ انتخاب‌شده' : '✔ در مالکیت شما') : `🪙 ${fa(c.price)}`;
+    const buy = $('shopBuy');
+    buy.textContent = selected ? '✔ در حال استفاده' : owned ? 'انتخاب' : `خرید 🪙 ${fa(c.price)}`;
+    buy.disabled = selected;
+    buy.classList.toggle('cant', !owned && save.coins < c.price);
+    const strip = $('shopStrip');
+    strip.innerHTML = '';
+    CHARACTERS.forEach((x, i) => {
+      const o = save.owned.includes(x.id), sel = save.selected === x.id;
       const b = document.createElement('button');
-      b.className = 'card' + (c.id === save.selected ? ' selected' : '');
-      b.dataset.action = 'shopItem';
-      b.dataset.id = c.id;
-      const label = owned ? (c.id === save.selected ? '✔ انتخاب‌شده' : 'انتخاب') : '🪙 ' + fa(c.price);
-      b.innerHTML = `<span class="emoji">${c.emoji}</span><span>${c.name}</span><small>${label}</small>`;
-      box.appendChild(b);
+      b.className = 'thumb' + (sel ? ' selected' : o ? ' owned' : ' locked') + (i === shopIndex ? ' current' : '') + (!o && save.coins >= x.price ? ' afford' : '');
+      b.dataset.action = 'shopView';
+      b.dataset.i = String(i);
+      b.innerHTML = `<span class="emoji">${x.emoji}</span><small>${sel ? '✔' : o ? '' : '🪙 ' + fa(x.price)}</small>`;
+      strip.appendChild(b);
     });
   }
 
+  function shopMove(dir) {
+    shopIndex = (shopIndex + dir + CHARACTERS.length) % CHARACTERS.length;
+    sfx.tick();
+    renderShop();
+  }
+
+  // افکت‌های بصری خرید موفق / ناموفق
+  function shopFx(kind, from, to) {
+    const st = $('shopStage'), cls = kind === 'buy' ? 'bought' : 'deny';
+    st.classList.remove('bought', 'deny'); void st.offsetWidth; st.classList.add(cls);
+    setTimeout(() => st.classList.remove(cls), 800);
+    if (kind !== 'buy') return;
+    const box = $('shopSparks');
+    box.innerHTML = '';
+    for (let i = 0; i < 14; i++) {
+      const sp = document.createElement('i');
+      const a = (i / 14) * Math.PI * 2, r = 60 + (i % 3) * 20;
+      sp.className = 'spark';
+      sp.style.setProperty('--dx', Math.round(Math.cos(a) * r) + 'px');
+      sp.style.setProperty('--dy', Math.round(Math.sin(a) * r - 20) + 'px');
+      box.appendChild(sp);
+    }
+    setTimeout(() => { box.innerHTML = ''; }, 900);
+    const pill = $('shopCoinPill');
+    pill.classList.remove('pop'); void pill.offsetWidth; pill.classList.add('pop');
+    countTo($('shopCoins'), from, to, 600);
+  }
+
+  function bindShop() {
+    const st = $('shopStage');
+    let x0 = null;
+    st.addEventListener('pointerdown', e => { x0 = e.clientX; });
+    st.addEventListener('pointerup', e => {
+      if (x0 === null) return;
+      const dx = e.clientX - x0; x0 = null;
+      if (Math.abs(dx) > 40) shopMove(dx < 0 ? 1 : -1); // در راست‌به‌چپ: کشیدن به چپ = بعدی
+    });
+    st.addEventListener('pointercancel', () => { x0 = null; });
+  }
   function backToMenu() {
     commitRun();
     state = 'menu'; stopMusic(); newGame();
     $('hud').hidden = true;
+    hideBanner();
     refreshMenu(); show('menu');
   }
   function startGame() {
@@ -807,6 +1109,7 @@
     show(null);
     $('hud').hidden = false;
     updateHud();
+    showBanner(0);
     startMusic();
   }
   function pauseGame() {
@@ -826,22 +1129,29 @@
     persist(); refreshMenu();
     if (save.muted) stopMusic(); else if (state === 'playing') startMusic();
   }
+  // خرید یا انتخاب. خرید فقط یک بار و به‌صورت یکجا (سکه + مالکیت) ذخیره می‌شود؛ کلیک تکراری فقط «انتخاب» است.
   function shopItem(id) {
     const c = CHARACTERS.find(x => x.id === id);
-    if (!c) return;
+    if (!c) return false;
     const msg = $('shopMsg');
     ensureAudio();
+    let bought = null;
     if (save.owned.includes(id)) {
-      save.selected = id; msg.textContent = `${c.name} انتخاب شد.`;
-    } else if (save.coins >= c.price) {
-      save.coins -= c.price; save.owned.push(id); save.selected = id; sfx.buy();
+      if (save.selected !== id) { save.selected = id; sfx.tick(); msg.textContent = `${c.name} انتخاب شد.`; }
+    } else if (Number.isFinite(c.price) && c.price >= 0 && save.coins >= c.price) {
+      bought = { from: save.coins, to: save.coins - c.price };
+      save.coins -= c.price; save.owned.push(id); save.selected = id;
+      sfx.buy(); vibrate(25);
       msg.textContent = `${c.name} خریداری شد! 🎉`;
     } else {
-      sfx.error(); msg.textContent = `سکه کافی نیست! ${fa(c.price - save.coins)} سکهٔ دیگر لازم است.`;
-      return;
+      sfx.error(); vibrate(40);
+      msg.textContent = `سکه کافی نیست! ${fa(c.price - save.coins)} سکهٔ دیگر لازم است.`;
+      renderShop(); shopFx('deny');
+      return false;
     }
-    persist(); renderShop();
-    checkProgress();
+    persist(); renderShop(); refreshMenu(); checkProgress();
+    if (bought) shopFx('buy', bought.from, bought.to);
+    return true;
   }
 
   /* ---------- مأموریت‌ها و دستاوردها ---------- */
@@ -981,7 +1291,15 @@
     start: startGame,
     menu: backToMenu,
     tutorial: () => show('tutorial'),
-    shop: () => { $('shopMsg').innerHTML = '&nbsp;'; renderShop(); show('shop'); },
+    shop: () => {
+      shopIndex = Math.max(0, CHARACTERS.findIndex(c => c.id === save.selected));
+      $('shopMsg').innerHTML = '&nbsp;';
+      renderShop(); show('shop');
+    },
+    shopPrev: () => shopMove(-1),
+    shopNext: () => shopMove(1),
+    shopView: b => { shopIndex = Number(b.dataset.i) || 0; sfx.tick(); renderShop(); },
+    shopBuy: () => shopItem(shopChar().id),
     pause: pauseGame,
     resume: resumeGame,
     mute: toggleMute,
@@ -1017,6 +1335,9 @@
         if (state === 'playing') pauseGame(); else if (state === 'paused') resumeGame();
         break;
       case 'KeyM': toggleMute(); break;
+      case 'ArrowLeft': case 'ArrowRight':
+        if (state !== 'playing' && currentScreen() === 'shop') { e.preventDefault(); shopMove(e.code === 'ArrowLeft' ? 1 : -1); }
+        break;
     }
   });
   document.addEventListener('keyup', e => {
@@ -1042,6 +1363,7 @@
   newGame();
   initHud();
   bindSettings();
+  bindShop();
   applyAudio();
   syncAnnounced();
   refreshMenu();
